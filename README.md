@@ -163,61 +163,7 @@ The Smart Event Registration and Auto-Communication System is a centralized plat
    npm start
    ```
 
-5. **Environment Configuration**
-   ```env
-   # Database
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=event_registration
-   DB_USER=your_username
-   DB_PASSWORD=your_password
-   
-   # JWT
-   JWT_SECRET=your_jwt_secret
-   
-   # Email
-   SMTP_HOST=your_smtp_host
-   SMTP_PORT=587
-   SMTP_USER=your_email
-   SMTP_PASS=your_password
-   
-   # File Upload
-   UPLOAD_PATH=./uploads
-   MAX_FILE_SIZE=5MB
-   ```
 
-## 📁 Project Structure
-
-```
-N8N_Hackthon/
-├── frontend/                 # React frontend application
-│   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── pages/          # Page components
-│   │   ├── services/       # API service calls
-│   │   ├── context/        # React context providers
-│   │   └── utils/          # Utility functions
-│   └── public/             # Static assets
-├── backend/                 # Node.js backend application
-│   ├── controllers/        # Route controllers
-│   ├── middleware/         # Custom middleware
-│   ├── models/            # Data models
-│   ├── routes/            # API routes
-│   ├── services/          # Business logic services
-│   ├── config/            # Configuration files
-│   └── uploads/           # File upload directory
-├── database/               # Database scripts and migrations
-│   ├── schema.sql         # Database schema
-│   ├── seeds.sql          # Sample data
-│   └── migrations/        # Database migrations
-├── docs/                  # Project documentation
-└── .kiro/                 # Kiro spec files
-    └── specs/
-        └── smart-event-registration-system/
-            ├── requirements.md
-            ├── design.md
-            └── tasks.md
-```
 
 ## 🔄 Workflow
 
