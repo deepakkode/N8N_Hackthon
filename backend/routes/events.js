@@ -194,7 +194,7 @@ router.post('/', [auth, organizerAuth], async (req, res) => {
     const event = new Event({
       name,
       description,
-      poster,
+      poster: poster && typeof poster === 'string' ? poster : null,
       venue,
       collegeName,
       category,

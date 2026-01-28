@@ -74,7 +74,7 @@ const StudentDashboard = () => {
       const basicEventData = {
         name: newEvent.name,
         description: newEvent.description,
-        poster: newEvent.poster,
+        poster: typeof newEvent.poster === 'string' ? newEvent.poster : null,
         venue: newEvent.venue,
         collegeName: newEvent.collegeName,
         category: newEvent.category,
