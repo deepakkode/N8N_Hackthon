@@ -251,47 +251,218 @@ const StudentDashboard = () => {
         {error && <div className="error-banner">{error}</div>}
         
         {activeTab === 'events' && (
-          <div className="simple-page">
-            <h2>Events Dashboard</h2>
-            <p>Total Events: {events.length}</p>
-            <div className="simple-events-list">
-              {events.map(event => (
-                <div key={event._id} className="simple-event-card">
-                  <h3>{event.title || event.name}</h3>
-                  <p>{event.description}</p>
-                  <p>📅 {event.date} ⏰ {event.time}</p>
-                  <p>📍 {event.venue || event.location}</p>
-                  <button onClick={() => registerForEvent(event._id)}>
-                    Register
-                  </button>
+          <>
+            <div className="dashboard-section">
+              <h2>Events Dashboard</h2>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <h3>Total Events</h3>
+                  <span className="stat-number">{events.length}</span>
                 </div>
-              ))}
+                <div className="stat-card">
+                  <h3>Available</h3>
+                  <span className="stat-number">{events.filter(e => new Date(e.date) >= new Date()).length}</span>
+                </div>
+                <div className="stat-card">
+                  <h3>Categories</h3>
+                  <span className="stat-number">{[...new Set(events.map(e => e.category))].length}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="events-section">
+              <h2>Available Events</h2>
+              {events.length === 0 ? (
+                <div className="no-events">
+                  <p>No events available. {user?.userType === 'organizer' ? 'Create your first event!' : 'Check back later for new events!'}</p>
+                </div>
+              ) : (
+                <div className="events-grid">
+                  {events.map(event => (
+                    <div key={event._id} className="event-card">
+                      <div className="event-header">
+                        <span className="category-badge" style={{backgroundColor: '#2563eb'}}>
+                          {event.category}
+                        </span>
+                      </div>
+                      
+                      <h3 className="event-title">{event.title || event.name}</h3>
+                      
+                      <div className="event-details">
+                        <div className="event-datetime">
+                          <span className="event-date">📅 {new Date(event.date).toLocaleDateString()}</span>
+                          <span className="event-time">⏰ {event.time}</span>
+                        </div>
+                        <div className="event-location">
+                          📍 {event.venue || event.location || 'TBD'}
+                        </div>
+                        <div className="event-organizer">
+                          👤 {event.organizer?.name || 'Unknown'}
+                        </div>
+                      </div>
+                      
+                      {event.description && (
+                        <p className="event-description">{event.description}</p>
+                      )}
+
+                      <div className="event-footer">
+                        <div className="attendee-info">
+                          <span className="attendee-count">
+                            {event.attendees?.length || 0} registered
+                          </span>
+                        </div>
+
+                        <div className="event-actions">
+                          {event.attendees?.includes(user?.id) ? (
+                            <button 
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => unregisterFromEvent(event._id)}
+                            >
+                              Unregister
+                            </button>
+                          ) : (
+                            <button 
+                              className="btn btn-primary btn-sm"
+                              onClick={() => registerForEvent(event._id)}
+                            >
+                              Register
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'my-events' && (
+          <div className="my-events-section">
+            <h2>My Events</h2>
+            <div className="events-stats">
+              <div className="stat-item">
+                <span className="stat-number">0</span>
+                <span className="stat-label">Total Applied</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-number">0</span>
+                <span className="stat-label">Approved</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-number">0</span>
+                <span className="stat-label">Pending</span>
+              </div>
+            </div>
+            
+            <div className="no-events">
+              <div className="no-events-icon">📅</div>
+              <h3>No Events Yet</h3>
+              <p>You haven't registered for any events yet.</p>
+              <p>Go to the Events tab to find and register for exciting events!</p>
             </div>
           </div>
         )}
 
-        {activeTab === 'my-events' && (
-          <div className="simple-page">
-            <h2>My Events</h2>
-            <p>This page is temporarily simplified to fix React errors.</p>
-            <p>User: {user?.name}</p>
-            <p>Type: {user?.userType}</p>
-          </div>
-        )}
-
         {activeTab === 'clubs' && (
-          <div className="simple-page">
-            <h2>Clubs</h2>
-            <p>This page is temporarily simplified to fix React errors.</p>
+          <div className="clubs-section">
+            <h2>Campus Clubs</h2>
+            <div className="clubs-stats">
+              <div className="stat-item">
+                <span className="stat-number">5</span>
+                <span className="stat-label">Active Clubs</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-number">150</span>
+                <span className="stat-label">Total Members</span>
+              </div>
+            </div>
+            
+            <div className="clubs-grid">
+              <div className="club-card">
+                <h3>Tech Innovation Club</h3>
+                <p>Exploring cutting-edge technology and innovation</p>
+                <div className="club-details">
+                  <span>👥 25 members</span>
+                  <span>📅 5 events</span>
+                </div>
+                <button className="btn btn-primary btn-sm">Join Club</button>
+              </div>
+              
+              <div className="club-card">
+                <h3>Cultural Society</h3>
+                <p>Celebrating arts, culture, and traditions</p>
+                <div className="club-details">
+                  <span>👥 40 members</span>
+                  <span>📅 8 events</span>
+                </div>
+                <button className="btn btn-primary btn-sm">Join Club</button>
+              </div>
+              
+              <div className="club-card">
+                <h3>Sports Club</h3>
+                <p>Promoting fitness and competitive sports</p>
+                <div className="club-details">
+                  <span>👥 35 members</span>
+                  <span>📅 12 events</span>
+                </div>
+                <button className="btn btn-primary btn-sm">Join Club</button>
+              </div>
+            </div>
           </div>
         )}
 
         {activeTab === 'profile' && (
-          <div className="simple-page">
-            <h2>Profile</h2>
-            <p>This page is temporarily simplified to fix React errors.</p>
-            <p>User: {user?.name}</p>
-            <p>Email: {user?.email}</p>
+          <div className="profile-section">
+            <h2>User Profile</h2>
+            <div className="profile-card">
+              <div className="profile-header">
+                <div className="profile-avatar">
+                  {user?.name?.charAt(0) || 'U'}
+                </div>
+                <div className="profile-info">
+                  <h3>{user?.name}</h3>
+                  <p>{user?.email}</p>
+                  <span className="user-type-badge">{user?.userType}</span>
+                </div>
+              </div>
+              
+              <div className="profile-details">
+                <div className="detail-row">
+                  <strong>Department:</strong> {user?.department}
+                </div>
+                <div className="detail-row">
+                  <strong>Year:</strong> {user?.year}
+                </div>
+                <div className="detail-row">
+                  <strong>Section:</strong> {user?.section}
+                </div>
+                <div className="detail-row">
+                  <strong>Phone:</strong> {user?.phone || 'Not provided'}
+                </div>
+              </div>
+              
+              <div className="profile-stats">
+                <div className="stat-item">
+                  <span className="stat-number">0</span>
+                  <span className="stat-label">Events Registered</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-number">0</span>
+                  <span className="stat-label">Clubs Joined</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-number">0</span>
+                  <span className="stat-label">Events Completed</span>
+                </div>
+              </div>
+              
+              <div className="profile-actions">
+                <button className="btn btn-primary">Edit Profile</button>
+                <button className="btn btn-danger" onClick={logout}>Logout</button>
+              </div>
+            </div>
           </div>
         )}
       </main>
