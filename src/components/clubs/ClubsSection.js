@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../config/api';
 import ClubCard from './ClubCard';
 
 const ClubsSection = ({ user }) => {
@@ -14,7 +15,7 @@ const ClubsSection = ({ user }) => {
   const fetchClubs = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5002/api/clubs');
+      const response = await axios.get(`${API_BASE_URL}/clubs`);
       setClubs(response.data);
       setError('');
     } catch (error) {

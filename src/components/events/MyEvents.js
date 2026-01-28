@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../../config/api';
 
 const MyEvents = ({ user }) => {
   const [events, setEvents] = useState([]);
@@ -13,7 +14,7 @@ const MyEvents = ({ user }) => {
   const fetchMyEvents = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5002/api/events/my-events', {
+      const response = await axios.get(`${API_BASE_URL}/events/my-events`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEvents(response.data);

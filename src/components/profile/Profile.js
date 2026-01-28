@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 
 const Profile = ({ user, onLogout }) => {
   const [profileData, setProfileData] = useState(null);
@@ -23,7 +24,7 @@ const Profile = ({ user, onLogout }) => {
   const fetchProfile = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5002/api/profile', {
+      const response = await axios.get(`${API_BASE_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfileData(response.data);
@@ -60,7 +61,7 @@ const Profile = ({ user, onLogout }) => {
   const handleSave = async () => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put('http://localhost:5002/api/profile', formData, {
+      await axios.put(`${API_BASE_URL}/profile`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEditing(false);
