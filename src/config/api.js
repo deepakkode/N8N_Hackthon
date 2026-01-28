@@ -4,7 +4,7 @@ const API_CONFIG = {
     baseURL: 'http://localhost:5002/api'
   },
   production: {
-    baseURL: process.env.REACT_APP_API_URL || 'https://your-backend-url.onrender.com/api'
+    baseURL: process.env.REACT_APP_API_URL || 'https://n8n-hackthon-2.onrender.com/api'
   }
 };
 
