@@ -182,17 +182,31 @@ const StudentDashboard = () => {
         return;
       }
 
-      await axios.post(`${API_BASE_URL}/events/${eventId}/register`, {}, {
+      // Send basic form data for simple registration
+      const registrationData = {
+        formData: {
+          name: user.name,
+          email: user.email,
+          phone: user.phone || '',
+          department: user.department,
+          year: user.year,
+          section: user.section
+        }
+      };
+
+      await axios.post(`${API_BASE_URL}/events/${eventId}/register`, registrationData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchEvents(); // Refresh events to update attendee count
+      alert('Successfully registered for the event!');
     } catch (error) {
       console.error('Error registering for event:', error);
       if (error.response?.status === 401) {
         logout();
         alert('Session expired. Please log in again.');
       } else {
-        alert('Failed to register: ' + (error.response?.data?.message || 'Unknown error'));
+        const errorMessage = error.response?.data?.message || 'Unknown error';
+        alert('Failed to register: ' + errorMessage);
       }
     }
   };

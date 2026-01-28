@@ -320,7 +320,7 @@ router.post('/:id/register', auth, async (req, res) => {
     // Add registration
     event.registrations.push({
       user: req.user._id,
-      formData: new Map(Object.entries(formData)),
+      formData: formData ? new Map(Object.entries(formData)) : new Map(),
       paymentScreenshot,
       paymentStatus: paymentScreenshot ? 'pending' : 'verified',
       registrationStatus: 'pending'
