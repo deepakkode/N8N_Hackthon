@@ -18,6 +18,352 @@ const StudentDashboard = () => {
 
   const { user, logout } = useAuth();
 
+  // Student My Events Component
+  const StudentMyEvents = ({ user }) => {
+    const [myEvents, setMyEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      fetchMyEvents();
+    }, []);
+
+    const fetchMyEvents = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/events/my-events`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMyEvents(response.data);
+      } catch (error) {
+        console.error('Error fetching my events:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (loading) {
+      return <div className="loading-spinner">Loading your events...</div>;
+    }
+
+    const registeredEvents = myEvents.filter(e => e.userRegistration?.registrationStatus === 'approved');
+    const pendingEvents = myEvents.filter(e => e.userRegistration?.registrationStatus === 'pending');
+    const rejectedEvents = myEvents.filter(e => e.userRegistration?.registrationStatus === 'rejected');
+
+    return (
+      <>
+        <div className="events-stats">
+          <div className="stat-item">
+            <span className="stat-number">{myEvents.length}</span>
+            <span className="stat-label">Total Applied</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-number">{registeredEvents.length}</span>
+            <span className="stat-label">Approved</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-number">{pendingEvents.length}</span>
+            <span className="stat-label">Pending</span>
+          </div>
+        </div>
+        
+        {myEvents.length === 0 ? (
+          <div className="no-events">
+            <div className="no-events-icon">📅</div>
+            <h3>No Events Yet</h3>
+            <p>You haven't registered for any events yet.</p>
+            <p>Go to the Events tab to find and register for exciting events!</p>
+          </div>
+        ) : (
+          <div className="events-grid">
+            {myEvents.map(event => (
+              <div key={event._id} className="event-card">
+                <div className="event-header">
+                  <span className="category-badge" style={{backgroundColor: '#2563eb'}}>
+                    {event.category}
+                  </span>
+                  <span className={`status-badge ${event.userRegistration?.registrationStatus || 'pending'}`}>
+                    {event.userRegistration?.registrationStatus || 'pending'}
+                  </span>
+                </div>
+                
+                <h3 className="event-title">{event.title || event.name}</h3>
+                
+                <div className="event-details">
+                  <div className="event-datetime">
+                    <span className="event-date">📅 {new Date(event.date).toLocaleDateString()}</span>
+                    <span className="event-time">⏰ {event.time}</span>
+                  </div>
+                  <div className="event-location">
+                    📍 {event.venue || event.location || 'TBD'}
+                  </div>
+                  <div className="event-organizer">
+                    👤 {event.organizer?.name || 'Unknown'}
+                  </div>
+                </div>
+                
+                {event.description && (
+                  <p className="event-description">{event.description}</p>
+                )}
+
+                <div className="event-footer">
+                  <div className="registration-status">
+                    {event.userRegistration?.registrationStatus === 'approved' && (
+                      <span className="status-message approved">✅ You're registered!</span>
+                    )}
+                    {event.userRegistration?.registrationStatus === 'pending' && (
+                      <span className="status-message pending">⏳ Awaiting approval...</span>
+                    )}
+                    {event.userRegistration?.registrationStatus === 'rejected' && (
+                      <span className="status-message rejected">❌ Registration declined</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
+
+  // Organizer My Events Component
+  const OrganizerMyEvents = ({ user }) => {
+    const [myEvents, setMyEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedEvent, setSelectedEvent] = useState(null);
+    const [showApplications, setShowApplications] = useState(false);
+    const [applications, setApplications] = useState([]);
+
+    useEffect(() => {
+      fetchMyEvents();
+    }, []);
+
+    const fetchMyEvents = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/events/organizer/my-events`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMyEvents(response.data);
+      } catch (error) {
+        console.error('Error fetching my events:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleViewApplications = async (event) => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/events/${event._id}/applications`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setApplications(response.data);
+        setSelectedEvent(event);
+        setShowApplications(true);
+      } catch (error) {
+        console.error('Error fetching applications:', error);
+        alert('Failed to load applications');
+      }
+    };
+
+    const handleApplicationAction = async (applicationId, action) => {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.put(
+          `${API_BASE_URL}/events/${selectedEvent._id}/applications/${applicationId}`,
+          { registrationStatus: action },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        // Refresh applications
+        handleViewApplications(selectedEvent);
+        
+        // Refresh events to update counts
+        fetchMyEvents();
+        
+        alert(`Application ${action} successfully!`);
+      } catch (error) {
+        console.error('Error updating application:', error);
+        alert('Failed to update application');
+      }
+    };
+
+    if (loading) {
+      return <div className="loading-spinner">Loading your events...</div>;
+    }
+
+    const publishedEvents = myEvents.filter(e => e.isPublished);
+    const draftEvents = myEvents.filter(e => !e.isPublished);
+    const totalApplications = myEvents.reduce((sum, e) => sum + (e.registrations?.length || 0), 0);
+
+    return (
+      <>
+        <div className="events-stats">
+          <div className="stat-item">
+            <span className="stat-number">{myEvents.length}</span>
+            <span className="stat-label">Total Events</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-number">{publishedEvents.length}</span>
+            <span className="stat-label">Published</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-number">{totalApplications}</span>
+            <span className="stat-label">Applications</span>
+          </div>
+        </div>
+        
+        {myEvents.length === 0 ? (
+          <div className="no-events">
+            <div className="no-events-icon">📅</div>
+            <h3>No Events Created Yet</h3>
+            <p>You haven't created any events yet.</p>
+            <p>Click the "Add Event" button to create your first event!</p>
+          </div>
+        ) : (
+          <div className="events-grid">
+            {myEvents.map(event => (
+              <div key={event._id} className="event-card">
+                <div className="event-header">
+                  <span className="category-badge" style={{backgroundColor: '#2563eb'}}>
+                    {event.category}
+                  </span>
+                  <span className={`status-badge ${event.isPublished ? 'published' : 'draft'}`}>
+                    {event.isPublished ? 'Published' : 'Draft'}
+                  </span>
+                </div>
+                
+                <h3 className="event-title">{event.title || event.name}</h3>
+                
+                <div className="event-details">
+                  <div className="event-datetime">
+                    <span className="event-date">📅 {new Date(event.date).toLocaleDateString()}</span>
+                    <span className="event-time">⏰ {event.time}</span>
+                  </div>
+                  <div className="event-location">
+                    📍 {event.venue || event.location || 'TBD'}
+                  </div>
+                  <div className="event-applications">
+                    👥 {event.registrations?.length || 0} applications
+                  </div>
+                </div>
+                
+                {event.description && (
+                  <p className="event-description">{event.description}</p>
+                )}
+
+                <div className="event-footer">
+                  <div className="event-actions">
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleViewApplications(event)}
+                    >
+                      View Applications ({event.registrations?.length || 0})
+                    </button>
+                    {!event.isPublished && (
+                      <button className="btn btn-secondary btn-sm">
+                        Publish Event
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Applications Modal */}
+        {showApplications && selectedEvent && (
+          <div className="modal-overlay">
+            <div className="applications-modal">
+              <div className="applications-header">
+                <h2>Applications for {selectedEvent.name}</h2>
+                <button className="close-btn" onClick={() => setShowApplications(false)}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div className="applications-content">
+                {applications.length === 0 ? (
+                  <div className="no-applications">
+                    <h3>No applications yet</h3>
+                    <p>No one has applied for this event yet.</p>
+                  </div>
+                ) : (
+                  <div className="applications-list">
+                    {applications.map(application => (
+                      <div key={application._id} className="application-card">
+                        <div className="application-header">
+                          <div className="applicant-info">
+                            <h4>{application.user?.name || 'Unknown'}</h4>
+                            <p>{application.user?.email}</p>
+                          </div>
+                          <div className="application-status">
+                            <span className={`status-badge ${application.registrationStatus}`}>
+                              {application.registrationStatus}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="application-details">
+                          <div className="detail-item">
+                            <span className="label">Applied:</span>
+                            <span>{new Date(application.registeredAt).toLocaleDateString()}</span>
+                          </div>
+                          
+                          {application.paymentScreenshot && (
+                            <div className="detail-item">
+                              <span className="label">Payment:</span>
+                              <span className={`payment-status ${application.paymentStatus}`}>
+                                {application.paymentStatus}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="application-actions">
+                          {application.registrationStatus === 'pending' && (
+                            <>
+                              <button 
+                                className="btn btn-success btn-sm"
+                                onClick={() => handleApplicationAction(application._id, 'approved')}
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                className="btn btn-danger btn-sm"
+                                onClick={() => handleApplicationAction(application._id, 'rejected')}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          
+                          {application.registrationStatus !== 'pending' && (
+                            <button 
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => handleApplicationAction(application._id, 'pending')}
+                            >
+                              Reset to Pending
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   // Fetch events from API
   const fetchEvents = async () => {
     try {
@@ -308,12 +654,12 @@ const StudentDashboard = () => {
                       <div className="event-footer">
                         <div className="attendee-info">
                           <span className="attendee-count">
-                            {event.attendees?.length || 0} registered
+                            {event.registrations?.length || 0} applications
                           </span>
                         </div>
 
                         <div className="event-actions">
-                          {event.attendees?.includes(user?.id) ? (
+                          {events.find(e => e._id === event._id)?.registrations?.some(r => r.user === user?.id) ? (
                             <button 
                               className="btn btn-secondary btn-sm"
                               onClick={() => unregisterFromEvent(event._id)}
@@ -340,28 +686,13 @@ const StudentDashboard = () => {
 
         {activeTab === 'my-events' && (
           <div className="my-events-section">
-            <h2>My Events</h2>
-            <div className="events-stats">
-              <div className="stat-item">
-                <span className="stat-number">0</span>
-                <span className="stat-label">Total Applied</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">0</span>
-                <span className="stat-label">Approved</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">0</span>
-                <span className="stat-label">Pending</span>
-              </div>
-            </div>
+            <h2>{user?.userType === 'organizer' ? 'My Organized Events' : 'My Events'}</h2>
             
-            <div className="no-events">
-              <div className="no-events-icon">📅</div>
-              <h3>No Events Yet</h3>
-              <p>You haven't registered for any events yet.</p>
-              <p>Go to the Events tab to find and register for exciting events!</p>
-            </div>
+            {user?.userType === 'student' ? (
+              <StudentMyEvents user={user} />
+            ) : (
+              <OrganizerMyEvents user={user} />
+            )}
           </div>
         )}
 
