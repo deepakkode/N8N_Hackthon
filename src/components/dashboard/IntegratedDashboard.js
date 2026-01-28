@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 
 const IntegratedDashboard = ({ events, user }) => {
   const [profileStats, setProfileStats] = useState(null);
@@ -13,7 +14,7 @@ const IntegratedDashboard = ({ events, user }) => {
   const fetchProfileStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5002/api/profile', {
+      const response = await axios.get(`${API_BASE_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfileStats(response.data.stats);
