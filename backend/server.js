@@ -12,11 +12,23 @@ const app = express();
 // CORS Configuration
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL, 'https://vivento-campus-events.netlify.app']
+    ? [
+        process.env.FRONTEND_URL, 
+        'https://vivento-campus-events.netlify.app',
+        'https://creative-scone-3fca73.netlify.app'
+      ]
     : ['http://localhost:3000', 'http://localhost:3010'],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
+
+console.log('CORS Configuration:', {
+  environment: process.env.NODE_ENV,
+  frontendUrl: process.env.FRONTEND_URL,
+  allowedOrigins: corsOptions.origin
+});
 
 // Middleware
 app.use(cors(corsOptions));
