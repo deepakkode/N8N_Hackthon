@@ -33,6 +33,7 @@ The repository is already available at: https://github.com/deepakkode/N8N_Hackth
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
    - **Instance Type**: Free
+   - **Auto-Deploy**: Yes
 
 ### 1.3 Set Environment Variables on Render
 In the Render dashboard, go to Environment and add:
