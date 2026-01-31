@@ -440,69 +440,6 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Please enter a valid email' });
     }
 
-    // TEMPORARY: Check if MongoDB is available
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState !== 1) {
-      console.log('🚨 MongoDB not connected - using temporary bypass for testing');
-      
-      // Temporary test users for UI testing
-      const testUsers = {
-        'test@klu.ac.in': {
-          id: '507f1f77bcf86cd799439011',
-          name: 'Test Student',
-          email: 'test@klu.ac.in',
-          userType: 'student',
-          year: '3rd Year',
-          department: 'Computer Science',
-          section: 'A',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: false,
-          clubName: null
-        },
-        '99240041367@klu.ac.in': {
-          id: '507f1f77bcf86cd799439012',
-          name: 'Test Organizer',
-          email: '99240041367@klu.ac.in',
-          userType: 'organizer',
-          year: '4th Year',
-          department: 'Computer Science',
-          section: 'B',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: true,
-          clubName: 'Tech Club'
-        },
-        '99240041365@klu.ac.in': {
-          id: '507f1f77bcf86cd799439013',
-          name: 'Ananya Cherukuri',
-          email: '99240041365@klu.ac.in',
-          userType: 'organizer',
-          year: '4th Year',
-          department: 'Computer Science',
-          section: 'A',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: true,
-          clubName: 'Innovation Club'
-        }
-      };
-
-      const testUser = testUsers[email.toLowerCase()];
-      if (!testUser || password !== '123456') {
-        return res.status(400).json({ message: 'Invalid credentials (use password: 123456 for testing)' });
-      }
-
-      const token = generateToken(testUser.id);
-      console.log('✅ Temporary login successful for:', email);
-      
-      return res.json({
-        message: 'Login successful (temporary mode - database offline)',
-        token,
-        user: testUser
-      });
-    }
-
     // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
@@ -566,65 +503,6 @@ router.post('/login', async (req, res) => {
 // @access  Private
 router.get('/me', auth, async (req, res) => {
   try {
-    // TEMPORARY: Check if MongoDB is available
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState !== 1) {
-      console.log('🚨 MongoDB not connected - using temporary user data');
-      
-      // Extract user ID from token (set by auth middleware)
-      const userId = req.user?.userId || req.user?.id;
-      
-      // Temporary test users for UI testing
-      const testUsers = {
-        '507f1f77bcf86cd799439011': {
-          id: '507f1f77bcf86cd799439011',
-          name: 'Test Student',
-          email: 'test@klu.ac.in',
-          userType: 'student',
-          year: '3rd Year',
-          department: 'Computer Science',
-          section: 'A',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: false,
-          clubName: null
-        },
-        '507f1f77bcf86cd799439012': {
-          id: '507f1f77bcf86cd799439012',
-          name: 'Test Organizer',
-          email: '99240041367@klu.ac.in',
-          userType: 'organizer',
-          year: '4th Year',
-          department: 'Computer Science',
-          section: 'B',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: true,
-          clubName: 'Tech Club'
-        },
-        '507f1f77bcf86cd799439013': {
-          id: '507f1f77bcf86cd799439013',
-          name: 'Ananya Cherukuri',
-          email: '99240041365@klu.ac.in',
-          userType: 'organizer',
-          year: '4th Year',
-          department: 'Computer Science',
-          section: 'A',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: true,
-          clubName: 'Innovation Club'
-        }
-      };
-
-      const testUser = testUsers[userId];
-      if (!testUser) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      return res.json({ user: testUser });
-    }
-
     res.json({
       user: {
         id: req.user._id,

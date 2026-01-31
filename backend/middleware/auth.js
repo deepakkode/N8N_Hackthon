@@ -10,66 +10,6 @@ const auth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // TEMPORARY: Check if MongoDB is available
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState !== 1) {
-      console.log('🚨 MongoDB not connected - using temporary user data in auth middleware');
-      
-      // Temporary test users for UI testing
-      const testUsers = {
-        '507f1f77bcf86cd799439011': {
-          _id: '507f1f77bcf86cd799439011',
-          name: 'Test Student',
-          email: 'test@klu.ac.in',
-          userType: 'student',
-          year: '3rd Year',
-          department: 'Computer Science',
-          section: 'A',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: false,
-          clubName: null
-        },
-        '507f1f77bcf86cd799439012': {
-          _id: '507f1f77bcf86cd799439012',
-          name: 'Test Organizer',
-          email: '99240041367@klu.ac.in',
-          userType: 'organizer',
-          year: '4th Year',
-          department: 'Computer Science',
-          section: 'B',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: true,
-          clubName: 'Tech Club'
-        },
-        '507f1f77bcf86cd799439013': {
-          _id: '507f1f77bcf86cd799439013',
-          name: 'Ananya Cherukuri',
-          email: '99240041365@klu.ac.in',
-          userType: 'organizer',
-          year: '4th Year',
-          department: 'Computer Science',
-          section: 'A',
-          college: 'KL University',
-          isEmailVerified: true,
-          isClubVerified: true,
-          clubName: 'Innovation Club'
-        }
-      };
-
-      const testUser = testUsers[decoded.userId];
-      if (!testUser) {
-        return res.status(401).json({ message: 'Token is not valid' });
-      }
-
-      req.user = testUser;
-      req.user.userId = decoded.userId; // Add userId for compatibility
-      next();
-      return;
-    }
-
     const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {

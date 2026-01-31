@@ -58,70 +58,30 @@ router.delete('/clear-all', async (req, res) => {
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    // Temporary mock data for testing UI while database is down
-    const mockEvents = [
-      {
-        _id: '507f1f77bcf86cd799439011',
-        name: 'Tech Hackathon 2024',
-        description: 'Join us for an exciting 24-hour hackathon where students will build innovative solutions to real-world problems. Teams of 2-4 members will compete for amazing prizes.',
-        poster: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjNjY3ZWVhIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5IYWNrYXRob24gUG9zdGVyPC90ZXh0Pgo8L3N2Zz4=',
-        venue: 'Tech Block - Lab 301',
-        collegeName: 'KL University',
-        category: 'technical',
-        date: new Date('2024-02-15'),
-        time: '09:00',
-        maxParticipants: 100,
-        organizer: { name: 'Tech Club', email: 'tech@klu.ac.in' },
-        club: { name: 'Tech Innovation Club' },
-        registrations: [],
-        isPublished: true,
-        isActive: true,
-        paymentRequired: false,
-        createdAt: new Date()
-      },
-      {
-        _id: '507f1f77bcf86cd799439012',
-        name: 'Cultural Fest - Kaleidoscope',
-        description: 'Experience the vibrant cultural diversity of our campus through dance, music, drama, and art. Multiple competitions and performances throughout the day.',
-        poster: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjZjU5ZTBiIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5DdWx0dXJhbCBGZXN0PC90ZXh0Pgo8L3N2Zz4=',
-        venue: 'Main Auditorium',
-        collegeName: 'KL University',
-        category: 'cultural',
-        date: new Date('2024-02-20'),
-        time: '14:00',
-        maxParticipants: 500,
-        organizer: { name: 'Cultural Committee', email: 'cultural@klu.ac.in' },
-        club: { name: 'Cultural Arts Society' },
-        registrations: [],
-        isPublished: true,
-        isActive: true,
-        paymentRequired: true,
-        paymentAmount: 50,
-        createdAt: new Date()
-      },
-      {
-        _id: '507f1f77bcf86cd799439013',
-        name: 'Sports Championship',
-        description: 'Annual inter-department sports championship featuring cricket, football, basketball, badminton, and athletics. Show your sporting spirit!',
-        poster: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjMTBiOTgxIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5TcG9ydHMgRXZlbnQ8L3RleHQ+Cjwvc3ZnPg==',
-        venue: 'Sports Complex',
-        collegeName: 'KL University',
-        category: 'sports',
-        date: new Date('2024-02-25'),
-        time: '08:00',
-        maxParticipants: 200,
-        organizer: { name: 'Sports Committee', email: 'sports@klu.ac.in' },
-        club: { name: 'Sports Club' },
-        registrations: [],
-        isPublished: true,
-        isActive: true,
-        paymentRequired: false,
-        createdAt: new Date()
-      }
-    ];
+    const events = await Event.find({ 
+      isPublished: true, 
+      isActive: true 
+    })
+    .populate('organizer', 'name email')
+    .populate('club', 'name')
+    .sort({ date: 1 });
 
-    console.log('📊 Serving mock events data for UI testing');
-    res.json(mockEvents);
+    // Add user's registration status to each event
+    const eventsWithUserInfo = events.map(event => {
+      const userRegistration = event.registrations.find(
+        reg => reg.user.toString() === req.user._id.toString()
+      );
+      
+      return {
+        ...event.toObject(),
+        userRegistration: userRegistration ? {
+          registrationStatus: userRegistration.registrationStatus,
+          registeredAt: userRegistration.registeredAt
+        } : null
+      };
+    });
+
+    res.json(eventsWithUserInfo);
   } catch (error) {
     console.error('Get events error:', error);
     res.status(500).json({ message: 'Server error' });
