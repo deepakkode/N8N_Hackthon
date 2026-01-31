@@ -7,7 +7,7 @@ const Header = ({ user, onAddEvent, activeTab, onTabChange, hideNavigation = fal
     <header className="header">
       <div className="container">
         <div className="header-left">
-          <h1>🎓 Vivento</h1>
+          <h1>Vivento</h1>
         </div>
         
         {!hideNavigation && (

@@ -5252,3 +5252,53 @@ body {
   font-family: 'Courier New', monospace;
   font-weight: 700;
 }
+/* My Event Card Wrapper for Organizers */
+.my-event-card-wrapper {
+  position: relative;
+}
+
+.organizer-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.organizer-actions .btn {
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.organizer-actions .btn-primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.organizer-actions .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.organizer-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.9);
+  color: #667eea;
+  border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.organizer-actions .btn-secondary:hover {
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 768px) {
+  .organizer-actions {
+    flex-direction: column;
+  }
+}

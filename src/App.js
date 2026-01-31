@@ -7,6 +7,11 @@ import AuthPage from './components/auth/AuthPage';
 import OrganizerDashboard from './components/dashboard/OrganizerDashboard';
 import Header from './components/dashboard/Header';
 import AddEventModal from './components/events/AddEventModal';
+import DiscoverPage from './components/discover/DiscoverPage';
+import MyEventsPage from './components/events/MyEventsPage';
+import ClubsPage from './components/clubs/ClubsPage';
+import ProfilePage from './components/profile/ProfilePage';
+import EventCard from './components/events/EventCard';
 
 // Organizer My Events Component
 const OrganizerMyEvents = ({ user }) => {
@@ -98,7 +103,14 @@ const OrganizerMyEvents = ({ user }) => {
       
       {myEvents.length === 0 ? (
         <div className="no-events">
-          <div className="no-events-icon">📅</div>
+          <div className="no-events-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+              <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+              <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+          </div>
           <h3>No Events Created Yet</h3>
           <p>You haven't created any events yet.</p>
           <p>Click the "Add Event" button to create your first event!</p>
@@ -106,49 +118,26 @@ const OrganizerMyEvents = ({ user }) => {
       ) : (
         <div className="events-grid">
           {myEvents.map(event => (
-            <div key={event.id} className="event-card">
-              <div className="event-header">
-                <span className="category-badge" style={{backgroundColor: '#2563eb'}}>
-                  {event.category}
-                </span>
-                <span className={`status-badge ${event.isPublished ? 'published' : 'draft'}`}>
-                  {event.isPublished ? 'Published' : 'Draft'}
-                </span>
-              </div>
+            <div key={event.id} className="my-event-card-wrapper">
+              <EventCard
+                event={event}
+                currentUser={user}
+                onRegister={() => {}}
+                onUnregister={() => {}}
+              />
               
-              <h3 className="event-title">{event.title || event.name}</h3>
-              
-              <div className="event-details">
-                <div className="event-datetime">
-                  <span className="event-date">📅 {new Date(event.date).toLocaleDateString()}</span>
-                  <span className="event-time">⏰ {event.time}</span>
-                </div>
-                <div className="event-location">
-                  📍 {event.venue || event.location || 'TBD'}
-                </div>
-                <div className="event-applications">
-                  👥 {event.registrations?.length || 0} applications
-                </div>
-              </div>
-              
-              {event.description && (
-                <p className="event-description">{event.description}</p>
-              )}
-
-              <div className="event-footer">
-                <div className="event-actions">
-                  <button 
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleViewApplications(event)}
-                  >
-                    View Applications ({event.registrations?.length || 0})
+              <div className="organizer-actions">
+                <button 
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleViewApplications(event)}
+                >
+                  View Applications ({event.registrations?.length || 0})
+                </button>
+                {!event.isPublished && (
+                  <button className="btn btn-secondary btn-sm">
+                    Publish Event
                   </button>
-                  {!event.isPublished && (
-                    <button className="btn btn-secondary btn-sm">
-                      Publish Event
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           ))}
@@ -249,6 +238,7 @@ const OrganizerMyEvents = ({ user }) => {
 // Main Dashboard Component for Students
 const StudentDashboard = ({ hideHeader = false, parentActiveTab = null, onParentTabChange = null }) => {
   const [events, setEvents] = useState([]);
+  const [clubs, setClubs] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -310,7 +300,14 @@ const StudentDashboard = ({ hideHeader = false, parentActiveTab = null, onParent
         
         {myEvents.length === 0 ? (
           <div className="no-events">
-            <div className="no-events-icon">📅</div>
+            <div className="no-events-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+                <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </div>
             <h3>No Events Yet</h3>
             <p>You haven't registered for any events yet.</p>
             <p>Go to the Events tab to find and register for exciting events!</p>
@@ -318,49 +315,13 @@ const StudentDashboard = ({ hideHeader = false, parentActiveTab = null, onParent
         ) : (
           <div className="events-grid">
             {myEvents.map(event => (
-              <div key={event.id} className="event-card">
-                <div className="event-header">
-                  <span className="category-badge" style={{backgroundColor: '#2563eb'}}>
-                    {event.category}
-                  </span>
-                  <span className={`status-badge ${event.userRegistration?.registrationStatus || 'pending'}`}>
-                    {event.userRegistration?.registrationStatus || 'pending'}
-                  </span>
-                </div>
-                
-                <h3 className="event-title">{event.title || event.name}</h3>
-                
-                <div className="event-details">
-                  <div className="event-datetime">
-                    <span className="event-date">📅 {new Date(event.date).toLocaleDateString()}</span>
-                    <span className="event-time">⏰ {event.time}</span>
-                  </div>
-                  <div className="event-location">
-                    📍 {event.venue || event.location || 'TBD'}
-                  </div>
-                  <div className="event-organizer">
-                    👤 {event.organizer?.name || 'Unknown'}
-                  </div>
-                </div>
-                
-                {event.description && (
-                  <p className="event-description">{event.description}</p>
-                )}
-
-                <div className="event-footer">
-                  <div className="registration-status">
-                    {event.userRegistration?.registrationStatus === 'approved' && (
-                      <span className="status-message approved">✅ You're registered!</span>
-                    )}
-                    {event.userRegistration?.registrationStatus === 'pending' && (
-                      <span className="status-message pending">⏳ Awaiting approval...</span>
-                    )}
-                    {event.userRegistration?.registrationStatus === 'rejected' && (
-                      <span className="status-message rejected">❌ Registration declined</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <EventCard
+                key={event.id}
+                event={event}
+                currentUser={user}
+                onRegister={() => {}}
+                onUnregister={() => {}}
+              />
             ))}
           </div>
         )}
@@ -411,10 +372,36 @@ const StudentDashboard = ({ hideHeader = false, parentActiveTab = null, onParent
     }
   };
 
+  // Fetch clubs from API
+  const fetchClubs = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.log('No token available, skipping clubs fetch');
+        setClubs([]);
+        return;
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/clubs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('Fetched clubs:', response.data);
+      setClubs(response.data);
+    } catch (error) {
+      console.error('Error fetching clubs:', error);
+      if (error.response?.status === 401) {
+        logout();
+      }
+    }
+  };
+
   useEffect(() => {
     // Only fetch events if user is authenticated
     if (user && user.isEmailVerified) {
       fetchEvents();
+      fetchClubs();
     }
   }, [user]);
 
@@ -614,216 +601,25 @@ const StudentDashboard = ({ hideHeader = false, parentActiveTab = null, onParent
         {error && <div className="error-banner">{error}</div>}
         
         {activeTab === 'events' && (
-          <>
-            <div className="dashboard-section">
-              <h2>Discover Dashboard</h2>
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <h3>Total Events</h3>
-                  <span className="stat-number">{events.length}</span>
-                </div>
-                <div className="stat-card">
-                  <h3>Available</h3>
-                  <span className="stat-number">{events.filter(e => new Date(e.date) >= new Date()).length}</span>
-                </div>
-                <div className="stat-card">
-                  <h3>Categories</h3>
-                  <span className="stat-number">{[...new Set(events.map(e => e.category))].length}</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="events-section">
-              <h2>Discover Events</h2>
-              {events.length === 0 ? (
-                <div className="no-events">
-                  <p>No events available. {user?.userType === 'organizer' ? 'Create your first event!' : 'Check back later for new events!'}</p>
-                </div>
-              ) : (
-                <div className="events-list">
-                  {events.map(event => (
-                    <div key={event.id} className="event-card-horizontal">
-                      <div className="event-poster-left">
-                        {event.poster ? (
-                          <img src={event.poster} alt={event.name} />
-                        ) : (
-                          <div className="no-poster-placeholder">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-                              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2"/>
-                              <polyline points="21,15 16,10 5,21" stroke="currentColor" strokeWidth="2"/>
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <div className="event-details-right">
-                        <h3 className="event-title">{event.name}</h3>
-                        <p className="event-description">{event.description}</p>
-                        <div className="event-meta-info">
-                          <span className="event-date">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-                              <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
-                              <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
-                              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
-                            </svg>
-                            {new Date(event.date).toLocaleDateString()}
-                          </span>
-                          <span className="event-venue">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M21 10C21 17 12 23 12 23S3 17 3 10C3 5.02944 7.02944 1 12 1C16.9706 1 21 5.02944 21 10Z" stroke="currentColor" strokeWidth="2"/>
-                              <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2"/>
-                            </svg>
-                            {event.venue}
-                          </span>
-                          <span className="event-category">{event.category}</span>
-                        </div>
-                        <div className="event-actions">
-                          {!event.userRegistration ? (
-                            <button 
-                              className="register-btn"
-                              onClick={() => registerForEvent(event.id)}
-                            >
-                              Register
-                            </button>
-                          ) : (
-                            <div className="registration-status">
-                              <span className={`status-badge ${event.userRegistration.registrationStatus}`}>
-                                {event.userRegistration.registrationStatus === 'pending' && 'Pending Approval'}
-                                {event.userRegistration.registrationStatus === 'approved' && 'Registered'}
-                                {event.userRegistration.registrationStatus === 'rejected' && 'Registration Rejected'}
-                              </span>
-                              {event.userRegistration.registrationStatus === 'pending' && (
-                                <button 
-                                  className="unregister-btn"
-                                  onClick={() => unregisterFromEvent(event.id)}
-                                >
-                                  Cancel
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
+          <DiscoverPage 
+            events={events}
+            clubs={clubs}
+            currentUser={user}
+            onRegisterEvent={registerForEvent}
+            onUnregisterEvent={unregisterFromEvent}
+          />
         )}
 
         {activeTab === 'my-events' && (
-          <div className="my-events-section">
-            <h2>{user?.userType === 'organizer' ? 'My Organized Events' : 'My Events'}</h2>
-            
-            {user?.userType === 'student' ? (
-              <StudentMyEvents user={user} />
-            ) : (
-              <OrganizerMyEvents user={user} />
-            )}
-          </div>
+          <MyEventsPage user={user} userType={user?.userType} />
         )}
 
         {activeTab === 'clubs' && (
-          <div className="clubs-section">
-            <h2>Campus Clubs</h2>
-            <div className="clubs-stats">
-              <div className="stat-item">
-                <span className="stat-number">5</span>
-                <span className="stat-label">Active Clubs</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">150</span>
-                <span className="stat-label">Total Members</span>
-              </div>
-            </div>
-            
-            <div className="clubs-grid">
-              <div className="club-card">
-                <h3>Tech Innovation Club</h3>
-                <p>Exploring cutting-edge technology and innovation</p>
-                <div className="club-details">
-                  <span>👥 25 members</span>
-                  <span>📅 5 events</span>
-                </div>
-                <button className="btn btn-primary btn-sm">Join Club</button>
-              </div>
-              
-              <div className="club-card">
-                <h3>Cultural Society</h3>
-                <p>Celebrating arts, culture, and traditions</p>
-                <div className="club-details">
-                  <span>👥 40 members</span>
-                  <span>📅 8 events</span>
-                </div>
-                <button className="btn btn-primary btn-sm">Join Club</button>
-              </div>
-              
-              <div className="club-card">
-                <h3>Sports Club</h3>
-                <p>Promoting fitness and competitive sports</p>
-                <div className="club-details">
-                  <span>👥 35 members</span>
-                  <span>📅 12 events</span>
-                </div>
-                <button className="btn btn-primary btn-sm">Join Club</button>
-              </div>
-            </div>
-          </div>
+          <ClubsPage user={user} />
         )}
 
         {activeTab === 'profile' && (
-          <div className="profile-section">
-            <h2>User Profile</h2>
-            <div className="profile-card">
-              <div className="profile-header">
-                <div className="profile-avatar">
-                  {user?.name?.charAt(0) || 'U'}
-                </div>
-                <div className="profile-info">
-                  <h3>{user?.name}</h3>
-                  <p>{user?.email}</p>
-                  <span className="user-type-badge">{user?.userType}</span>
-                </div>
-              </div>
-              
-              <div className="profile-details">
-                <div className="detail-row">
-                  <strong>Department:</strong> {user?.department}
-                </div>
-                <div className="detail-row">
-                  <strong>Year:</strong> {user?.year}
-                </div>
-                <div className="detail-row">
-                  <strong>Section:</strong> {user?.section}
-                </div>
-                <div className="detail-row">
-                  <strong>Phone:</strong> {user?.phone || 'Not provided'}
-                </div>
-              </div>
-              
-              <div className="profile-stats">
-                <div className="stat-item">
-                  <span className="stat-number">0</span>
-                  <span className="stat-label">Events Registered</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">0</span>
-                  <span className="stat-label">Clubs Joined</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">0</span>
-                  <span className="stat-label">Events Completed</span>
-                </div>
-              </div>
-              
-              <div className="profile-actions">
-                <button className="btn btn-primary">Edit Profile</button>
-                <button className="btn btn-danger" onClick={logout}>Logout</button>
-              </div>
-            </div>
-          </div>
+          <ProfilePage />
         )}
       </main>
 
@@ -850,6 +646,127 @@ const AppContent = () => {
   const { isAuthenticated, loading, user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('events'); // Start with 'events' instead of 'dashboard'
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [clubs, setClubs] = useState([]);
+
+  // Fetch events from API
+  const fetchEvents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.log('No token available, skipping events fetch');
+        setEvents([]);
+        return;
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/events`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('Fetched events:', response.data);
+      setEvents(response.data);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      if (error.response?.status === 401) {
+        logout();
+      }
+    }
+  };
+
+  // Fetch clubs from API
+  const fetchClubs = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.log('No token available, skipping clubs fetch');
+        setClubs([]);
+        return;
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/clubs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('Fetched clubs:', response.data);
+      setClubs(response.data);
+    } catch (error) {
+      console.error('Error fetching clubs:', error);
+      if (error.response?.status === 401) {
+        logout();
+      }
+    }
+  };
+
+  // Register for event function
+  const registerForEvent = async (eventId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Please log in to register for events');
+        return;
+      }
+
+      const registrationData = {
+        formData: {
+          name: user.name,
+          email: user.email,
+          phone: user.phone || '',
+          department: user.department,
+          year: user.year,
+          section: user.section
+        }
+      };
+
+      await axios.post(`${API_BASE_URL}/events/${eventId}/register`, registrationData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchEvents(); // Refresh events to update attendee count
+      alert('Successfully registered for the event!');
+    } catch (error) {
+      console.error('Error registering for event:', error);
+      if (error.response?.status === 401) {
+        logout();
+        alert('Session expired. Please log in again.');
+      } else {
+        const errorMessage = error.response?.data?.message || 'Unknown error';
+        alert('Failed to register: ' + errorMessage);
+      }
+    }
+  };
+
+  // Unregister from event function
+  const unregisterFromEvent = async (eventId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Please log in to unregister from events');
+        return;
+      }
+
+      await axios.post(`${API_BASE_URL}/events/${eventId}/unregister`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchEvents(); // Refresh events to update attendee count
+    } catch (error) {
+      console.error('Error unregistering from event:', error);
+      if (error.response?.status === 401) {
+        logout();
+        alert('Session expired. Please log in again.');
+      } else {
+        alert('Failed to unregister: ' + (error.response?.data?.message || 'Unknown error'));
+      }
+    }
+  };
+
+  // Fetch data when user is authenticated
+  React.useEffect(() => {
+    if (user && user.isEmailVerified) {
+      fetchEvents();
+      fetchClubs();
+    }
+  }, [user]);
 
   if (loading) {
     return (
@@ -891,113 +808,19 @@ const AppContent = () => {
           onTabChange={setActiveTab}
         />
         {activeTab === 'events' ? (
-          <StudentDashboard 
-            hideHeader={true} 
-            parentActiveTab={activeTab}
-            onParentTabChange={setActiveTab}
+          <DiscoverPage 
+            events={events}
+            clubs={clubs}
+            currentUser={user}
+            onRegisterEvent={registerForEvent}
+            onUnregisterEvent={unregisterFromEvent}
           />
         ) : activeTab === 'my-events' ? (
-          <div className="my-events-section">
-            <h2>My Organized Events</h2>
-            <OrganizerMyEvents user={user} />
-          </div>
+          <MyEventsPage user={user} />
         ) : activeTab === 'clubs' ? (
-          <div className="clubs-section">
-            <h2>Campus Clubs</h2>
-            <div className="clubs-stats">
-              <div className="stat-item">
-                <span className="stat-number">5</span>
-                <span className="stat-label">Active Clubs</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">120</span>
-                <span className="stat-label">Total Members</span>
-              </div>
-            </div>
-            
-            <div className="clubs-grid">
-              <div className="club-card">
-                <h3>Tech Innovation Club</h3>
-                <p>Exploring cutting-edge technology and innovation</p>
-                <div className="club-details">
-                  <span>👥 25 members</span>
-                  <span>📅 5 events</span>
-                </div>
-                <button className="btn btn-primary btn-sm">Join Club</button>
-              </div>
-              
-              <div className="club-card">
-                <h3>Cultural Society</h3>
-                <p>Celebrating arts, culture, and traditions</p>
-                <div className="club-details">
-                  <span>👥 40 members</span>
-                  <span>📅 8 events</span>
-                </div>
-                <button className="btn btn-primary btn-sm">Join Club</button>
-              </div>
-              
-              <div className="club-card">
-                <h3>Sports Club</h3>
-                <p>Promoting fitness and competitive sports</p>
-                <div className="club-details">
-                  <span>👥 35 members</span>
-                  <span>📅 12 events</span>
-                </div>
-                <button className="btn btn-primary btn-sm">Join Club</button>
-              </div>
-            </div>
-          </div>
+          <ClubsPage user={user} />
         ) : activeTab === 'profile' ? (
-          <div className="profile-section">
-            <h2>User Profile</h2>
-            <div className="profile-card">
-              <div className="profile-header">
-                <div className="profile-avatar">
-                  {user?.name?.charAt(0) || 'U'}
-                </div>
-                <div className="profile-info">
-                  <h3>{user?.name}</h3>
-                  <p>{user?.email}</p>
-                  <span className="user-type-badge">{user?.userType}</span>
-                </div>
-              </div>
-              
-              <div className="profile-details">
-                <div className="detail-row">
-                  <strong>Department:</strong> {user?.department}
-                </div>
-                <div className="detail-row">
-                  <strong>Year:</strong> {user?.year}
-                </div>
-                <div className="detail-row">
-                  <strong>Section:</strong> {user?.section}
-                </div>
-                <div className="detail-row">
-                  <strong>Phone:</strong> {user?.phone || 'Not provided'}
-                </div>
-              </div>
-              
-              <div className="profile-stats">
-                <div className="stat-item">
-                  <span className="stat-number">0</span>
-                  <span className="stat-label">Events Created</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">1</span>
-                  <span className="stat-label">Club Managed</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">0</span>
-                  <span className="stat-label">Total Applications</span>
-                </div>
-              </div>
-              
-              <div className="profile-actions">
-                <button className="btn btn-primary">Edit Profile</button>
-                <button className="btn btn-danger" onClick={logout}>Logout</button>
-              </div>
-            </div>
-          </div>
+          <ProfilePage />
         ) : null}
         
         {isModalOpen && (

@@ -17,12 +17,7 @@ const corsOptions = {
         'https://vivento-campus-events.netlify.app',
         'https://creative-scone-3fca73.netlify.app'
       ]
-    : [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3010',
-        'http://localhost:3011'
-      ],
+    : true, // Allow all origins in development
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -82,7 +77,7 @@ app.get('/', (req, res) => {
   });
 });
 
-const PORT = 5006;
+const PORT = process.env.PORT || 5007;
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   
