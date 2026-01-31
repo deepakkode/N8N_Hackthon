@@ -19,7 +19,7 @@ router.post('/create', [auth], async (req, res) => {
     });
 
     // Basic validation
-    const { clubName, clubDescription, facultyName, facultyEmail, facultyDepartment } = req.body;
+    const { clubName, clubDescription, clubLogo, facultyName, facultyEmail, facultyDepartment } = req.body;
     
     if (!clubName || clubName.trim().length < 3) {
       return res.status(400).json({ message: 'Club name must be at least 3 characters' });
@@ -27,6 +27,26 @@ router.post('/create', [auth], async (req, res) => {
     
     if (!clubDescription || clubDescription.trim().length < 10) {
       return res.status(400).json({ message: 'Club description must be at least 10 characters' });
+    }
+    
+    if (!clubLogo || clubLogo.trim().length < 10) {
+      return res.status(400).json({ message: 'Club logo is required' });
+    }
+    
+    // Validate logo format (base64 or URL)
+    const isBase64 = clubLogo.startsWith('data:image/');
+    const isURL = clubLogo.startsWith('http://') || clubLogo.startsWith('https://');
+    
+    if (!isBase64 && !isURL) {
+      return res.status(400).json({ message: 'Please provide a valid image (upload or URL)' });
+    }
+    
+    if (isURL) {
+      try {
+        new URL(clubLogo);
+      } catch (error) {
+        return res.status(400).json({ message: 'Please provide a valid logo URL' });
+      }
     }
     
     if (!facultyName || facultyName.trim().length < 2) {
@@ -51,8 +71,6 @@ router.post('/create', [auth], async (req, res) => {
     if (existingClub) {
       return res.status(400).json({ message: 'You already have a club. Each organizer can only create one club.' });
     }
-
-    const { clubLogo } = req.body;
 
     // Check if club name already exists
     const existingClubName = await Club.findOne({ 
@@ -130,7 +148,26 @@ router.post('/verify-faculty', async (req, res) => {
       return res.status(400).json({ message: 'Faculty already verified' });
     }
 
-    if (club.facultyVerificationToken !== otp && otp !== '123456') {
+    console.log('Faculty verification attempt:', {
+      clubId,
+      receivedOTP: otp,
+      storedOTP: club.facultyVerificationToken,
+      otpMatch: club.facultyVerificationToken === otp,
+      stringMatch: String(club.facultyVerificationToken) === String(otp),
+      isExpired: club.facultyVerificationExpires < new Date()
+    });
+
+    // Convert both to strings for comparison to handle type mismatches
+    const storedOTPString = String(club.facultyVerificationToken);
+    const receivedOTPString = String(otp);
+
+    if (storedOTPString !== receivedOTPString && otp !== '123456') {
+      console.log('❌ OTP mismatch:', {
+        expected: storedOTPString,
+        received: receivedOTPString,
+        storedType: typeof club.facultyVerificationToken,
+        receivedType: typeof otp
+      });
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 

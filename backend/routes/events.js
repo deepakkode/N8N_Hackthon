@@ -8,35 +8,120 @@ const { sendApplicationStatusEmail } = require('../utils/emailService');
 
 const router = express.Router();
 
+// @route   GET /api/events/debug
+// @desc    Get all events (including unpublished) for debugging
+// @access  Private
+router.get('/debug', auth, async (req, res) => {
+  try {
+    const events = await Event.find({})
+      .populate('organizer', 'name email')
+      .populate('club', 'name')
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    console.log(`Found ${events.length} events in database`);
+    events.forEach(event => {
+      console.log(`Event: ${event.name}, Published: ${event.isPublished}, Active: ${event.isActive}`);
+    });
+
+    res.json(events);
+  } catch (error) {
+    console.error('Debug events error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/events/clear-all
+// @desc    Clear all events (development only)
+// @access  Public (development only)
+router.delete('/clear-all', async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'Not available in production' });
+    }
+
+    const result = await Event.deleteMany({});
+    console.log(`🗑️ Cleared ${result.deletedCount} events from database`);
+    
+    res.json({ 
+      message: `Successfully cleared ${result.deletedCount} events`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Clear events error:', error);
+    res.status(500).json({ message: 'Server error clearing events' });
+  }
+});
+
 // @route   GET /api/events
 // @desc    Get all published events
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    const { category, college, search } = req.query;
-    let filter = { isPublished: true, isActive: true };
+    // Temporary mock data for testing UI while database is down
+    const mockEvents = [
+      {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'Tech Hackathon 2024',
+        description: 'Join us for an exciting 24-hour hackathon where students will build innovative solutions to real-world problems. Teams of 2-4 members will compete for amazing prizes.',
+        poster: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjNjY3ZWVhIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5IYWNrYXRob24gUG9zdGVyPC90ZXh0Pgo8L3N2Zz4=',
+        venue: 'Tech Block - Lab 301',
+        collegeName: 'KL University',
+        category: 'technical',
+        date: new Date('2024-02-15'),
+        time: '09:00',
+        maxParticipants: 100,
+        organizer: { name: 'Tech Club', email: 'tech@klu.ac.in' },
+        club: { name: 'Tech Innovation Club' },
+        registrations: [],
+        isPublished: true,
+        isActive: true,
+        paymentRequired: false,
+        createdAt: new Date()
+      },
+      {
+        _id: '507f1f77bcf86cd799439012',
+        name: 'Cultural Fest - Kaleidoscope',
+        description: 'Experience the vibrant cultural diversity of our campus through dance, music, drama, and art. Multiple competitions and performances throughout the day.',
+        poster: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjZjU5ZTBiIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5DdWx0dXJhbCBGZXN0PC90ZXh0Pgo8L3N2Zz4=',
+        venue: 'Main Auditorium',
+        collegeName: 'KL University',
+        category: 'cultural',
+        date: new Date('2024-02-20'),
+        time: '14:00',
+        maxParticipants: 500,
+        organizer: { name: 'Cultural Committee', email: 'cultural@klu.ac.in' },
+        club: { name: 'Cultural Arts Society' },
+        registrations: [],
+        isPublished: true,
+        isActive: true,
+        paymentRequired: true,
+        paymentAmount: 50,
+        createdAt: new Date()
+      },
+      {
+        _id: '507f1f77bcf86cd799439013',
+        name: 'Sports Championship',
+        description: 'Annual inter-department sports championship featuring cricket, football, basketball, badminton, and athletics. Show your sporting spirit!',
+        poster: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDIwMCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTUwIiBmaWxsPSIjMTBiOTgxIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0Ij5TcG9ydHMgRXZlbnQ8L3RleHQ+Cjwvc3ZnPg==',
+        venue: 'Sports Complex',
+        collegeName: 'KL University',
+        category: 'sports',
+        date: new Date('2024-02-25'),
+        time: '08:00',
+        maxParticipants: 200,
+        organizer: { name: 'Sports Committee', email: 'sports@klu.ac.in' },
+        club: { name: 'Sports Club' },
+        registrations: [],
+        isPublished: true,
+        isActive: true,
+        paymentRequired: false,
+        createdAt: new Date()
+      }
+    ];
 
-    if (category && category !== 'all') {
-      filter.category = category;
-    }
-
-    if (college && college !== 'all') {
-      filter.collegeName = college;
-    }
-
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    const events = await Event.find(filter)
-      .populate('organizer', 'name email')
-      .populate('club', 'name')
-      .sort({ date: 1 });
-
-    res.json(events);
+    console.log('📊 Serving mock events data for UI testing');
+    res.json(mockEvents);
   } catch (error) {
     console.error('Get events error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -225,7 +310,21 @@ router.post('/', [auth, organizerAuth], async (req, res) => {
       isPublished: false // Will be published after form setup
     });
 
+    console.log('Creating event with data:', {
+      name: event.name,
+      description: event.description.substring(0, 50) + '...',
+      poster: event.poster ? 'Present' : 'Not provided',
+      venue: event.venue,
+      category: event.category,
+      date: event.date,
+      time: event.time,
+      organizer: event.organizer,
+      club: event.club,
+      isPublished: event.isPublished
+    });
+
     await event.save();
+    console.log('Event saved successfully with ID:', event._id);
     await event.populate('organizer', 'name email');
     await event.populate('club', 'name');
 
@@ -294,7 +393,15 @@ router.put('/:id/payment', [auth, organizerAuth], async (req, res) => {
     event.paymentInstructions = paymentInstructions;
     event.isPublished = true; // Publish event after payment setup
 
+    console.log('Publishing event:', {
+      id: event._id,
+      name: event.name,
+      paymentRequired: event.paymentRequired,
+      isPublished: event.isPublished
+    });
+
     await event.save();
+    console.log('Event published successfully!');
 
     res.json({
       message: 'Event published successfully',

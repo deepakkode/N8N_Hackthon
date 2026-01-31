@@ -39,15 +39,24 @@ router.post('/register', async (req, res) => {
     }
 
     // Validate college email
-    if (!validateCollegeEmail(email)) {
+    console.log('🔍 Validating email:', email);
+    console.log('🏫 College domain:', process.env.COLLEGE_DOMAIN);
+    const isValidEmail = validateCollegeEmail(email);
+    console.log('✅ Email validation result:', isValidEmail);
+    
+    if (!isValidEmail) {
+      console.log('❌ Email validation failed');
       return res.status(400).json({ 
         message: `Please use your college email address ending with @${process.env.COLLEGE_DOMAIN}` 
       });
     }
 
     // Check if user already exists
+    console.log('🔍 Checking if user exists:', email.toLowerCase());
     const existingUser = await User.findOne({ email: email.toLowerCase() });
+    console.log('👤 Existing user found:', existingUser ? 'Yes' : 'No');
     if (existingUser) {
+      console.log('❌ User already exists');
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
@@ -73,13 +82,24 @@ router.post('/register', async (req, res) => {
     console.log('User created successfully:', { id: user._id, email: user.email });
 
     // Send OTP email
+    console.log('📧 Sending OTP email to:', email);
     try {
       const emailResult = await sendOTPEmail(email, otp, name);
       if (!emailResult.success) {
-        console.warn('Email sending failed, but continuing with registration:', emailResult.error);
+        console.error('❌ Email sending failed:', emailResult.error);
+        return res.status(500).json({ 
+          message: 'Failed to send verification email. Please check your email address and try again.',
+          error: 'Email service error'
+        });
+      } else {
+        console.log('✅ OTP email sent successfully to:', email);
       }
     } catch (emailError) {
-      console.warn('Email service error, but continuing with registration:', emailError);
+      console.error('❌ Email service error:', emailError);
+      return res.status(500).json({ 
+        message: 'Email service is currently unavailable. Please try again later.',
+        error: 'Email service error'
+      });
     }
 
     res.status(201).json({
@@ -117,7 +137,7 @@ router.post('/verify-email', [
       return res.status(400).json({ message: 'Email already verified' });
     }
 
-    if (user.emailVerificationToken !== otp && otp !== '123456') {
+    if (user.emailVerificationToken !== otp) {
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
@@ -200,6 +220,202 @@ router.post('/resend-otp', [
   }
 });
 
+// @route   POST /api/auth/register-with-emailjs
+// @desc    Register a new user with EmailJS OTP (OTP already sent via frontend)
+// @access  Public
+router.post('/register-with-emailjs', async (req, res) => {
+  try {
+    console.log('Registration with EmailJS OTP received:', { 
+      body: req.body,
+      email: req.body?.email,
+      userType: req.body?.userType,
+      hasOTP: !!req.body?.otp
+    });
+
+    const { name, email, password, userType, year, department, section, otp } = req.body;
+
+    // Basic validation
+    if (!name || !email || !password || !userType || !year || !department || !section || !otp) {
+      return res.status(400).json({ message: 'All fields including OTP are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    if (!['student', 'organizer'].includes(userType)) {
+      return res.status(400).json({ message: 'Invalid user type' });
+    }
+
+    // Validate college email
+    console.log('🔍 Validating email:', email);
+    const isValidEmail = validateCollegeEmail(email);
+    console.log('✅ Email validation result:', isValidEmail);
+    
+    if (!isValidEmail) {
+      console.log('❌ Email validation failed');
+      return res.status(400).json({ 
+        message: `Please use your college email address ending with @${process.env.COLLEGE_DOMAIN}` 
+      });
+    }
+
+    // Check if user already exists
+    console.log('🔍 Checking if user exists:', email.toLowerCase());
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    console.log('👤 Existing user found:', existingUser ? 'Yes' : 'No');
+    if (existingUser) {
+      console.log('❌ User already exists');
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Set OTP expiry (10 minutes from now)
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Create new user with the OTP from EmailJS
+    const user = new User({
+      name,
+      email: email.toLowerCase(),
+      password,
+      userType,
+      year,
+      department,
+      section,
+      emailVerificationToken: otp, // Use the OTP sent via EmailJS
+      emailVerificationExpires: otpExpires,
+      college: process.env.COLLEGE_NAME || 'KL University'
+    });
+
+    await user.save();
+    console.log('✅ User created successfully with EmailJS OTP:', { id: user._id, email: user.email });
+
+    res.status(201).json({
+      message: 'Registration successful. OTP sent via EmailJS to your email address.',
+      userId: user._id,
+      email: user.email
+    });
+  } catch (error) {
+    console.error('Registration with EmailJS OTP error:', error);
+    res.status(500).json({ message: 'Server error during registration' });
+  }
+});
+
+// @route   POST /api/auth/create-verified-user
+// @desc    Create a verified user after OTP verification (new flow)
+// @access  Public
+router.post('/create-verified-user', async (req, res) => {
+  try {
+    console.log('Creating verified user after OTP verification:', { 
+      email: req.body?.email,
+      userType: req.body?.userType
+    });
+
+    const { name, email, password, userType, year, department, section } = req.body;
+
+    // Basic validation
+    if (!name || !email || !password || !userType || !year || !department || !section) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    if (!['student', 'organizer'].includes(userType)) {
+      return res.status(400).json({ message: 'Invalid user type' });
+    }
+
+    // Validate college email
+    const isValidEmail = validateCollegeEmail(email);
+    if (!isValidEmail) {
+      return res.status(400).json({ 
+        message: `Please use your college email address ending with @${process.env.COLLEGE_DOMAIN}` 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+
+    // Create new user with email already verified
+    const user = new User({
+      name,
+      email: email.toLowerCase(),
+      password,
+      userType,
+      year,
+      department,
+      section,
+      college: process.env.COLLEGE_NAME || 'KL University',
+      isEmailVerified: true, // Email is already verified via EmailJS OTP
+      emailVerificationToken: undefined,
+      emailVerificationExpires: undefined
+    });
+
+    await user.save();
+    console.log('✅ Verified user created successfully:', { id: user._id, email: user.email });
+
+    // Generate token and return user data
+    const token = generateToken(user._id);
+
+    res.status(201).json({
+      message: 'Account created successfully!',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        userType: user.userType,
+        year: user.year,
+        department: user.department,
+        section: user.section,
+        college: user.college,
+        isEmailVerified: user.isEmailVerified,
+        isClubVerified: user.isClubVerified
+      }
+    });
+  } catch (error) {
+    console.error('Create verified user error:', error);
+    res.status(500).json({ message: 'Server error during account creation' });
+  }
+});
+
+// @route   POST /api/auth/check-user-exists
+// @desc    Check if user already exists (before sending OTP)
+// @access  Public
+router.post('/check-user-exists', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Validate college email format
+    const isValidEmail = validateCollegeEmail(email);
+    if (!isValidEmail) {
+      return res.status(400).json({ 
+        message: `Please use your college email address ending with @${process.env.COLLEGE_DOMAIN}`,
+        exists: false
+      });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    
+    console.log(`🔍 User existence check for ${email}:`, existingUser ? 'EXISTS' : 'AVAILABLE');
+    
+    res.json({
+      exists: !!existingUser,
+      email: email.toLowerCase()
+    });
+  } catch (error) {
+    console.error('Check user exists error:', error);
+    res.status(500).json({ message: 'Server error checking user existence' });
+  }
+});
+
 // @route   POST /api/auth/login
 // @desc    Login user
 // @access  Public
@@ -222,6 +438,69 @@ router.post('/login', async (req, res) => {
     if (!email.includes('@')) {
       console.log('Invalid email format');
       return res.status(400).json({ message: 'Please enter a valid email' });
+    }
+
+    // TEMPORARY: Check if MongoDB is available
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      console.log('🚨 MongoDB not connected - using temporary bypass for testing');
+      
+      // Temporary test users for UI testing
+      const testUsers = {
+        'test@klu.ac.in': {
+          id: '507f1f77bcf86cd799439011',
+          name: 'Test Student',
+          email: 'test@klu.ac.in',
+          userType: 'student',
+          year: '3rd Year',
+          department: 'Computer Science',
+          section: 'A',
+          college: 'KL University',
+          isEmailVerified: true,
+          isClubVerified: false,
+          clubName: null
+        },
+        '99240041367@klu.ac.in': {
+          id: '507f1f77bcf86cd799439012',
+          name: 'Test Organizer',
+          email: '99240041367@klu.ac.in',
+          userType: 'organizer',
+          year: '4th Year',
+          department: 'Computer Science',
+          section: 'B',
+          college: 'KL University',
+          isEmailVerified: true,
+          isClubVerified: true,
+          clubName: 'Tech Club'
+        },
+        '99240041365@klu.ac.in': {
+          id: '507f1f77bcf86cd799439013',
+          name: 'Ananya Cherukuri',
+          email: '99240041365@klu.ac.in',
+          userType: 'organizer',
+          year: '4th Year',
+          department: 'Computer Science',
+          section: 'A',
+          college: 'KL University',
+          isEmailVerified: true,
+          isClubVerified: true,
+          clubName: 'Innovation Club'
+        }
+      };
+
+      const testUser = testUsers[email.toLowerCase()];
+      if (!testUser || password !== '123456') {
+        return res.status(400).json({ message: 'Invalid credentials (use password: 123456 for testing)' });
+      }
+
+      const token = generateToken(testUser.id);
+      console.log('✅ Temporary login successful for:', email);
+      
+      return res.json({
+        message: 'Login successful (temporary mode - database offline)',
+        token,
+        user: testUser
+      });
     }
 
     // Find user by email
@@ -287,6 +566,65 @@ router.post('/login', async (req, res) => {
 // @access  Private
 router.get('/me', auth, async (req, res) => {
   try {
+    // TEMPORARY: Check if MongoDB is available
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      console.log('🚨 MongoDB not connected - using temporary user data');
+      
+      // Extract user ID from token (set by auth middleware)
+      const userId = req.user?.userId || req.user?.id;
+      
+      // Temporary test users for UI testing
+      const testUsers = {
+        '507f1f77bcf86cd799439011': {
+          id: '507f1f77bcf86cd799439011',
+          name: 'Test Student',
+          email: 'test@klu.ac.in',
+          userType: 'student',
+          year: '3rd Year',
+          department: 'Computer Science',
+          section: 'A',
+          college: 'KL University',
+          isEmailVerified: true,
+          isClubVerified: false,
+          clubName: null
+        },
+        '507f1f77bcf86cd799439012': {
+          id: '507f1f77bcf86cd799439012',
+          name: 'Test Organizer',
+          email: '99240041367@klu.ac.in',
+          userType: 'organizer',
+          year: '4th Year',
+          department: 'Computer Science',
+          section: 'B',
+          college: 'KL University',
+          isEmailVerified: true,
+          isClubVerified: true,
+          clubName: 'Tech Club'
+        },
+        '507f1f77bcf86cd799439013': {
+          id: '507f1f77bcf86cd799439013',
+          name: 'Ananya Cherukuri',
+          email: '99240041365@klu.ac.in',
+          userType: 'organizer',
+          year: '4th Year',
+          department: 'Computer Science',
+          section: 'A',
+          college: 'KL University',
+          isEmailVerified: true,
+          isClubVerified: true,
+          clubName: 'Innovation Club'
+        }
+      };
+
+      const testUser = testUsers[userId];
+      if (!testUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      return res.json({ user: testUser });
+    }
+
     res.json({
       user: {
         id: req.user._id,

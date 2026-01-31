@@ -32,7 +32,7 @@ const eventSchema = new mongoose.Schema({
   },
   poster: {
     type: String, // URL or base64 string
-    default: null
+    required: false // Make poster optional for now
   },
   venue: {
     type: String,

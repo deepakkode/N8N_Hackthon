@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { sendOTPEmailJS, generateOTP } from '../services/emailService';
 
 const AuthContext = createContext();
 
@@ -107,35 +108,135 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/register`, userData);
+      console.log('🚀 Starting registration...');
       
-      const { userId, email } = response.data;
+      // FIRST: Check if user already exists BEFORE sending OTP
+      console.log('🔍 Checking if user already exists...');
+      try {
+        const checkResponse = await axios.post(`${API_BASE_URL}/auth/check-user-exists`, {
+          email: userData.email
+        });
+        
+        if (checkResponse.data.exists) {
+          console.log('❌ User already exists');
+          return { 
+            success: false, 
+            error: 'An account with this email already exists. Please login instead.' 
+          };
+        }
+        console.log('✅ Email is available for registration');
+      } catch (error) {
+        console.error('Error checking user existence:', error);
+        return { 
+          success: false, 
+          error: 'Unable to verify email availability. Please try again.' 
+        };
+      }
       
-      setPendingVerification({ userId, email });
+      // SECOND: Generate OTP and send via EmailJS (only if user doesn't exist)
+      const otp = generateOTP();
+      console.log('🔢 Generated OTP:', otp);
       
-      return { success: true, needsVerification: true };
+      console.log('📧 Sending OTP via EmailJS...');
+      const emailResult = await sendOTPEmailJS(userData.email, otp, userData.name);
+      
+      if (!emailResult.success) {
+        console.log('❌ EmailJS failed');
+        return { success: false, error: 'Failed to send OTP email. Please try again.' };
+      }
+      
+      console.log('✅ EmailJS OTP sent successfully!');
+      
+      // THIRD: Store registration data temporarily (don't create user in DB yet)
+      const tempRegistrationData = {
+        ...userData,
+        otp: otp,
+        otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes from now
+        tempId: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      };
+      
+      // Store in localStorage temporarily
+      localStorage.setItem('tempRegistration', JSON.stringify(tempRegistrationData));
+      
+      setPendingVerification({ 
+        tempId: tempRegistrationData.tempId,
+        email: userData.email,
+        isTemp: true // Flag to indicate this is temporary registration
+      });
+      
+      return { 
+        success: true, 
+        needsVerification: true,
+        message: `OTP sent to your email: ${userData.email}. Please check your inbox.`
+      };
     } catch (error) {
-      const message = error.response?.data?.message || 'Registration failed';
-      return { success: false, error: message };
+      console.error('Registration error:', error);
+      return { success: false, error: 'Registration failed. Please try again.' };
     }
   };
 
-  const verifyEmail = async (userId, otp) => {
+  const verifyEmail = async (userIdOrTempId, otp) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/verify-email`, {
-        userId,
-        otp
-      });
+      // Check if this is a temporary registration (new flow)
+      if (pendingVerification?.isTemp) {
+        console.log('🔍 Verifying temporary registration...');
+        
+        // Get temporary registration data
+        const tempData = localStorage.getItem('tempRegistration');
+        if (!tempData) {
+          return { success: false, error: 'Registration session expired. Please register again.' };
+        }
+        
+        const registrationData = JSON.parse(tempData);
+        
+        // Check if OTP matches
+        if (registrationData.otp !== otp) {
+          return { success: false, error: 'Invalid OTP. Please check your email and try again.' };
+        }
+        
+        // Check if OTP expired
+        if (Date.now() > registrationData.otpExpires) {
+          localStorage.removeItem('tempRegistration');
+          return { success: false, error: 'OTP has expired. Please register again.' };
+        }
+        
+        console.log('✅ OTP verified! Creating user in database...');
+        
+        // Now create the user in MongoDB (without OTP fields)
+        const { otp: _, otpExpires: __, tempId: ___, ...userData } = registrationData;
+        
+        const response = await axios.post(`${API_BASE_URL}/auth/create-verified-user`, userData);
+        const { token: newToken, user: userData2 } = response.data;
+        
+        // Clean up temporary data
+        localStorage.removeItem('tempRegistration');
+        
+        // Set user as logged in
+        localStorage.setItem('token', newToken);
+        setToken(newToken);
+        setUser(userData2);
+        setPendingVerification(null);
+        
+        console.log('✅ User created and logged in successfully!');
+        return { success: true };
+      } else {
+        // Old flow for existing users
+        const response = await axios.post(`${API_BASE_URL}/auth/verify-email`, {
+          userId: userIdOrTempId,
+          otp
+        });
 
-      const { token: newToken, user: userData } = response.data;
-      
-      localStorage.setItem('token', newToken);
-      setToken(newToken);
-      setUser(userData);
-      setPendingVerification(null);
-      
-      return { success: true };
+        const { token: newToken, user: userData } = response.data;
+        
+        localStorage.setItem('token', newToken);
+        setToken(newToken);
+        setUser(userData);
+        setPendingVerification(null);
+        
+        return { success: true };
+      }
     } catch (error) {
+      console.error('Email verification error:', error);
       const message = error.response?.data?.message || 'Verification failed';
       return { success: false, error: message };
     }

@@ -15,7 +15,7 @@ const clubSchema = new mongoose.Schema({
   },
   clubLogo: {
     type: String, // URL or base64 string
-    default: null
+    required: true // Make logo mandatory
   },
   
   // Organizer Info

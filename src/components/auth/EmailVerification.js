@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
+import { resendOTPEmailJS } from '../../services/emailService';
 
 const EmailVerification = ({ userId, email, onVerificationSuccess }) => {
   const [otp, setOtp] = useState('');
@@ -7,6 +8,8 @@ const EmailVerification = ({ userId, email, onVerificationSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [timer, setTimer] = useState(600); // 10 minutes in seconds
+
+  const { verifyEmail } = useAuth();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -33,18 +36,15 @@ const EmailVerification = ({ userId, email, onVerificationSuccess }) => {
     setLoading(true);
     setError('');
 
-    try {
-      const response = await axios.post('http://localhost:5002/api/auth/verify-email', {
-        userId,
-        otp
-      });
-
-      onVerificationSuccess(response.data);
-    } catch (error) {
-      setError(error.response?.data?.message || 'Verification failed');
-    } finally {
-      setLoading(false);
+    const result = await verifyEmail(userId, otp);
+    
+    if (result.success) {
+      onVerificationSuccess(result);
+    } else {
+      setError(result.error);
     }
+    
+    setLoading(false);
   };
 
   const handleResendOTP = async () => {
@@ -52,11 +52,17 @@ const EmailVerification = ({ userId, email, onVerificationSuccess }) => {
     setError('');
 
     try {
-      await axios.post('http://localhost:5002/api/auth/resend-otp', { userId });
-      setTimer(600); // Reset timer
-      alert('OTP sent successfully!');
+      const result = await resendOTPEmailJS();
+      
+      if (result.success) {
+        setTimer(600); // Reset timer to 10 minutes
+        alert(result.message);
+      } else {
+        setError(result.error);
+      }
     } catch (error) {
-      setError(error.response?.data?.message || 'Failed to resend OTP');
+      console.error('Resend OTP error:', error);
+      setError('Failed to resend OTP. Please try again.');
     } finally {
       setResendLoading(false);
     }
