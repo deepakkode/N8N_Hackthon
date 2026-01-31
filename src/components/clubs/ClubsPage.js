@@ -24,8 +24,11 @@ const ClubsPage = ({ user }) => {
       
       if (!token) {
         console.log('No token available, using demo data');
-        setClubs(getDemoClubs());
+        const demoClubs = getDemoClubs();
+        console.log('Demo clubs:', demoClubs);
+        setClubs(demoClubs);
         setError('');
+        setLoading(false);
         return;
       }
 
@@ -38,7 +41,9 @@ const ClubsPage = ({ user }) => {
       // If API returns empty array or no clubs, use demo data
       if (!response.data || response.data.length === 0) {
         console.log('No clubs from API, using demo data');
-        setClubs(getDemoClubs());
+        const demoClubs = getDemoClubs();
+        console.log('Demo clubs:', demoClubs);
+        setClubs(demoClubs);
       } else {
         setClubs(response.data);
       }
@@ -46,7 +51,9 @@ const ClubsPage = ({ user }) => {
     } catch (error) {
       console.error('Error fetching clubs:', error);
       console.log('API failed, using demo data');
-      setClubs(getDemoClubs());
+      const demoClubs = getDemoClubs();
+      console.log('Demo clubs:', demoClubs);
+      setClubs(demoClubs);
       setError('');
     } finally {
       setLoading(false);
@@ -147,6 +154,11 @@ const ClubsPage = ({ user }) => {
   const stats = getStats();
   const filteredClubs = getFilteredClubs();
   const departments = getDepartments();
+
+  // Debug logging
+  console.log('ClubsPage render - clubs:', clubs);
+  console.log('ClubsPage render - filteredClubs:', filteredClubs);
+  console.log('ClubsPage render - loading:', loading);
 
   return (
     <div className="clubs-page">

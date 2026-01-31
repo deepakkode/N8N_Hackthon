@@ -434,6 +434,11 @@ router.post('/:id/register', auth, async (req, res) => {
       return res.status(400).json({ message: 'Event is not available for registration' });
     }
 
+    // Check if user is the organizer of this event
+    if (event.organizerId === req.user.id) {
+      return res.status(400).json({ message: 'Organizers cannot register for their own events' });
+    }
+
     // Check if already registered
     const existingRegistration = await EventRegistration.findOne({
       where: { 

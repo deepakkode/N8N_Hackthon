@@ -6,9 +6,9 @@ backend/node_modules/
 build/
 # dist/ - Keep dist for deployment
 
-# Environment variables - TEMPORARILY COMMENTED OUT FOR SHARING
-# .env
-# backend/.env
+# Environment variables
+.env
+backend/.env
 
 # Logs
 npm-debug.log*

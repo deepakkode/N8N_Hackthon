@@ -213,8 +213,318 @@
 
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(800px, 1fr));
   gap: 2rem;
+  margin-top: 2rem;
+}
+
+/* Event Card Styles for My Events Page - Horizontal Layout */
+.event-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  height: 320px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+}
+
+.event-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.event-poster {
+  width: 280px;
+  min-width: 280px;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 20px 0 0 20px;
+}
+
+.event-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.3s ease;
+}
+
+.event-card:hover .event-poster img {
+  transform: scale(1.02);
+}
+
+.event-content {
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.category-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.status-badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.status-badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.approved {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.rejected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.event-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 0.8rem 0;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-details {
+  margin-bottom: 1rem;
+  flex: 1;
+  overflow: hidden;
+}
+
+.event-datetime {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.event-date, .event-time {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.event-location, .event-organizer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-description {
+  color: #777;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-clamp: 3;
+  overflow: hidden;
+  font-size: 0.95rem;
+  min-height: 4.5rem; /* Ensures space for 3 lines */
+}
+
+.event-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.attendee-info {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.attendee-count {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.event-price {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #28a745;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.event-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-register {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.btn-register:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-register:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.registration-confirmed, .registration-rejected, .registration-pending {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 15px;
+  white-space: nowrap;
+}
+
+.registration-confirmed {
+  color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.registration-rejected {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.registration-pending {
+  color: #ffc107;
+  background: rgba(255, 193, 7, 0.1);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 1024px) {
+  .events-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .event-card {
+    flex-direction: column;
+    height: auto;
+    min-height: 400px;
+  }
+  
+  .event-poster {
+    width: 100%;
+    min-width: 100%;
+    height: 200px;
+  }
+  
+  .event-content {
+    padding: 1.5rem;
+  }
+  
+  .event-title {
+    white-space: normal;
+    font-size: 1.2rem;
+  }
+  
+  .event-location, .event-organizer {
+    white-space: normal;
+  }
+  
+  .event-datetime {
+    gap: 1rem;
+  }
+  
+  .event-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .event-meta {
+    justify-content: center;
+  }
+  
+  .event-actions {
+    justify-content: center;
+  }
 }
 
 .my-event-card-wrapper {
@@ -341,4 +651,18 @@
   .organizer-actions {
     flex-direction: column;
   }
+}
+/* Organizer Badge */
+.organizer-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #6f42c1;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(111, 66, 193, 0.1);
+  border-radius: 15px;
+  white-space: nowrap;
+  border: 2px solid rgba(111, 66, 193, 0.2);
 }
