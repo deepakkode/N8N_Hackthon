@@ -1,7 +1,7 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const { testConnection, syncDatabase } = require('./config/database');
 // const { scheduleEventReminders } = require('./utils/notificationScheduler');
 
 // Load environment variables
@@ -17,7 +17,12 @@ const corsOptions = {
         'https://vivento-campus-events.netlify.app',
         'https://creative-scone-3fca73.netlify.app'
       ]
-    : ['http://localhost:3000', 'http://localhost:3010', 'http://localhost:3011'],
+    : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3010',
+        'http://localhost:3011'
+      ],
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -32,7 +37,8 @@ console.log('CORS Configuration:', {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -53,56 +59,32 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Connect to MongoDB with better error handling and fallback
-console.log('🔍 MongoDB URI from env:', process.env.MONGODB_URI ? 'Present' : 'Missing');
-console.log('🔍 MongoDB URI (first 50 chars):', process.env.MONGODB_URI?.substring(0, 50) + '...');
-
-const connectToMongoDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000, // Timeout after 10s instead of 30s
-      socketTimeoutMS: 45000,
-    });
-    console.log('✅ MongoDB connected successfully');
-    console.log('🏛️ Connected to:', mongoose.connection.name);
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err.message);
-    console.log('🔍 Attempted URI:', process.env.MONGODB_URI?.substring(0, 50) + '...');
-    
-    // Provide helpful error messages
-    if (err.message.includes('ECONNREFUSED')) {
-      console.log('🚨 Connection refused - possible causes:');
-      console.log('   1. MongoDB Atlas cluster is paused or stopped');
-      console.log('   2. Network firewall blocking connection');
-      console.log('   3. Incorrect cluster hostname');
-      console.log('   4. MongoDB Atlas service outage');
-      console.log('   5. Try getting a fresh connection string from Atlas dashboard');
-    }
-    
-    if (err.message.includes('ETIMEOUT')) {
-      console.log('🚨 DNS/Network timeout - possible causes:');
-      console.log('   1. Network firewall blocking MongoDB Atlas');
-      console.log('   2. DNS server cannot resolve MongoDB Atlas hostnames');
-      console.log('   3. Corporate network restrictions');
-      console.log('   4. Try using a VPN or different network');
-    }
-    
-    // Don't exit the server, just log the error
-    console.log('⚠️ Server will continue running but database operations will fail');
-    console.log('💡 Please check your MongoDB Atlas cluster status and connection string');
-  }
+// Connect to MySQL and sync database
+const initializeDatabase = async () => {
+  console.log('🔍 MySQL Configuration:');
+  console.log('   Host:', process.env.DB_HOST || 'localhost');
+  console.log('   Port:', process.env.DB_PORT || 3306);
+  console.log('   Database:', process.env.DB_NAME || 'vivento_events');
+  console.log('   User:', process.env.DB_USER || 'root');
+  
+  await testConnection();
+  await syncDatabase();
 };
 
-connectToMongoDB();
+initializeDatabase();
 
 // Basic route
 app.get('/', (req, res) => {
-  res.json({ message: 'College Events API is running!' });
+  res.json({ 
+    message: 'Vivento Campus Events API is running!',
+    database: 'MySQL',
+    version: '2.0.0'
+  });
 });
 
-const PORT = process.env.PORT || 5001;
+const PORT = 5006;
 app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
   
   // Check email service status
   try {

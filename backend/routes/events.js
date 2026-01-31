@@ -1,8 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const Event = require('../models/Event');
-const User = require('../models/User');
-const Club = require('../models/Club');
+const { Event, User, Club, EventRegistration } = require('../models/mysql');
 const { auth, organizerAuth } = require('../middleware/auth');
 const { sendApplicationStatusEmail } = require('../utils/emailService');
 
@@ -13,11 +11,14 @@ const router = express.Router();
 // @access  Private
 router.get('/debug', auth, async (req, res) => {
   try {
-    const events = await Event.find({})
-      .populate('organizer', 'name email')
-      .populate('club', 'name')
-      .sort({ createdAt: -1 })
-      .limit(10);
+    const events = await Event.findAll({
+      include: [
+        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: Club, as: 'club', attributes: ['name'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 10
+    });
 
     console.log(`Found ${events.length} events in database`);
     events.forEach(event => {
@@ -40,12 +41,12 @@ router.delete('/clear-all', async (req, res) => {
       return res.status(403).json({ message: 'Not available in production' });
     }
 
-    const result = await Event.deleteMany({});
-    console.log(`🗑️ Cleared ${result.deletedCount} events from database`);
+    const deletedCount = await Event.destroy({ where: {} });
+    console.log(`🗑️ Cleared ${deletedCount} events from database`);
     
     res.json({ 
-      message: `Successfully cleared ${result.deletedCount} events`,
-      deletedCount: result.deletedCount
+      message: `Successfully cleared ${deletedCount} events`,
+      deletedCount: deletedCount
     });
   } catch (error) {
     console.error('Clear events error:', error);
@@ -58,32 +59,46 @@ router.delete('/clear-all', async (req, res) => {
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    const events = await Event.find({ 
-      isPublished: true, 
-      isActive: true 
-    })
-    .populate('organizer', 'name email')
-    .populate('club', 'name')
-    .sort({ date: 1 });
+    console.log('📋 Fetching events for user:', req.user.email);
+    
+    const events = await Event.findAll({
+      where: { 
+        isPublished: true, 
+        isActive: true 
+      },
+      include: [
+        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: Club, as: 'club', attributes: ['name'] },
+        { 
+          model: EventRegistration, 
+          as: 'registrations',
+          include: [{ model: User, as: 'user', attributes: ['id'] }]
+        }
+      ],
+      order: [['date', 'ASC']]
+    });
+
+    console.log(`📊 Found ${events.length} events`);
 
     // Add user's registration status to each event
     const eventsWithUserInfo = events.map(event => {
       const userRegistration = event.registrations.find(
-        reg => reg.user.toString() === req.user._id.toString()
+        reg => reg.userId === req.user.id
       );
       
       return {
-        ...event.toObject(),
+        ...event.toJSON(),
         userRegistration: userRegistration ? {
           registrationStatus: userRegistration.registrationStatus,
-          registeredAt: userRegistration.registeredAt
+          registeredAt: userRegistration.createdAt
         } : null
       };
     });
 
+    console.log('✅ Events processed successfully, sending response');
     res.json(eventsWithUserInfo);
   } catch (error) {
-    console.error('Get events error:', error);
+    console.error('❌ Get events error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -93,24 +108,29 @@ router.get('/', auth, async (req, res) => {
 // @access  Private
 router.get('/my-events', auth, async (req, res) => {
   try {
-    const events = await Event.find({
-      'registrations.user': req.user._id
-    })
-    .populate('organizer', 'name email')
-    .populate('club', 'name')
-    .sort({ date: 1 });
-
-    // Add user's registration info to each event
-    const eventsWithUserInfo = events.map(event => {
-      const userRegistration = event.registrations.find(
-        reg => reg.user.toString() === req.user._id.toString()
-      );
-      
-      return {
-        ...event.toObject(),
-        userRegistration: userRegistration || null
-      };
+    const registrations = await EventRegistration.findAll({
+      where: { userId: req.user.id },
+      include: [{
+        model: Event,
+        as: 'event',
+        include: [
+          { model: User, as: 'organizer', attributes: ['name', 'email'] },
+          { model: Club, as: 'club', attributes: ['name'] }
+        ]
+      }],
+      order: [['createdAt', 'DESC']]
     });
+
+    // Format the response to include user registration info
+    const eventsWithUserInfo = registrations.map(registration => ({
+      ...registration.event.toJSON(),
+      userRegistration: {
+        registrationStatus: registration.registrationStatus,
+        registeredAt: registration.createdAt,
+        paymentStatus: registration.paymentStatus,
+        formData: registration.formData
+      }
+    }));
 
     res.json(eventsWithUserInfo);
   } catch (error) {
@@ -124,13 +144,19 @@ router.get('/my-events', auth, async (req, res) => {
 // @access  Private (Organizer only)
 router.get('/organizer/my-events', [auth, organizerAuth], async (req, res) => {
   try {
-    const events = await Event.find({
-      organizer: req.user._id
-    })
-    .populate('organizer', 'name email')
-    .populate('club', 'name')
-    .populate('registrations.user', 'name email')
-    .sort({ date: -1 });
+    const events = await Event.findAll({
+      where: { organizerId: req.user.id },
+      include: [
+        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: Club, as: 'club', attributes: ['name'] },
+        { 
+          model: EventRegistration, 
+          as: 'registrations',
+          include: [{ model: User, as: 'user', attributes: ['name', 'email'] }]
+        }
+      ],
+      order: [['date', 'DESC']]
+    });
 
     res.json(events);
   } catch (error) {
@@ -144,9 +170,17 @@ router.get('/organizer/my-events', [auth, organizerAuth], async (req, res) => {
 // @access  Private
 router.get('/:id', auth, async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id)
-      .populate('organizer', 'name email')
-      .populate('club', 'name');
+    const event = await Event.findByPk(req.params.id, {
+      include: [
+        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: Club, as: 'club', attributes: ['name'] },
+        { 
+          model: EventRegistration, 
+          as: 'registrations',
+          include: [{ model: User, as: 'user', attributes: ['id'] }]
+        }
+      ]
+    });
 
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
@@ -154,11 +188,11 @@ router.get('/:id', auth, async (req, res) => {
 
     // Check if user is already registered
     const userRegistration = event.registrations.find(
-      reg => reg.user.toString() === req.user._id.toString()
+      reg => reg.userId === req.user.id
     );
 
     res.json({
-      ...event.toObject(),
+      ...event.toJSON(),
       userRegistration: userRegistration || null,
       isRegistered: !!userRegistration
     });
@@ -229,33 +263,36 @@ router.post('/', [auth, organizerAuth], async (req, res) => {
 
     // Find user's club (allow testing without verified club)
     console.log('Looking for user club...');
-    let club = await Club.findOne({ organizer: req.user._id, isFacultyVerified: true });
-    console.log('Club found:', club ? { id: club._id, name: club.clubName, verified: club.isFacultyVerified } : 'No club found');
+    let club = await Club.findOne({ 
+      where: { 
+        organizerId: req.user.id, 
+        isFacultyVerified: true 
+      } 
+    });
+    console.log('Club found:', club ? { id: club.id, name: club.name, verified: club.isFacultyVerified } : 'No club found');
     
     // For testing purposes, create a default club if none exists
     if (!club) {
       console.log('No verified club found, creating/finding default club for testing');
-      club = await Club.findOne({ clubName: 'Default Test Club' });
+      club = await Club.findOne({ where: { name: 'Default Test Club' } });
       
       if (!club) {
-        club = new Club({
-          clubName: 'Default Test Club',
-          clubDescription: 'Default club for testing purposes',
-          organizer: req.user._id,
-          facultyAdvisor: {
-            name: 'Test Faculty',
-            email: 'faculty@test.com',
-            department: 'Computer Science'
-          },
+        club = await Club.create({
+          name: 'Default Test Club',
+          description: 'Default club for testing purposes',
+          organizerId: req.user.id,
+          facultyName: 'Test Faculty',
+          facultyEmail: 'faculty@test.com',
+          facultyDepartment: 'Computer Science',
+          college: req.user.college,
           isVerified: true,
           isFacultyVerified: true
         });
-        await club.save();
         console.log('Default test club created');
       }
     }
 
-    const event = new Event({
+    const event = await Event.create({
       name,
       description,
       poster: poster && typeof poster === 'string' ? poster : null,
@@ -264,9 +301,9 @@ router.post('/', [auth, organizerAuth], async (req, res) => {
       category,
       date,
       time,
-      maxParticipants: maxParticipants ? parseInt(maxParticipants) : undefined,
-      organizer: req.user._id,
-      club: club._id,
+      maxParticipants: maxParticipants ? parseInt(maxParticipants) : null,
+      organizerId: req.user.id,
+      clubId: club.id,
       isPublished: false // Will be published after form setup
     });
 
@@ -278,21 +315,26 @@ router.post('/', [auth, organizerAuth], async (req, res) => {
       category: event.category,
       date: event.date,
       time: event.time,
-      organizer: event.organizer,
-      club: event.club,
+      organizerId: event.organizerId,
+      clubId: event.clubId,
       isPublished: event.isPublished
     });
 
-    await event.save();
-    console.log('Event saved successfully with ID:', event._id);
-    await event.populate('organizer', 'name email');
-    await event.populate('club', 'name');
+    console.log('Event saved successfully with ID:', event.id);
 
-    console.log('Event created successfully:', { id: event._id, name: event.name });
+    // Load the event with associations
+    const eventWithAssociations = await Event.findByPk(event.id, {
+      include: [
+        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: Club, as: 'club', attributes: ['name'] }
+      ]
+    });
+
+    console.log('Event created successfully:', { id: event.id, name: event.name });
 
     res.status(201).json({
       message: 'Event created successfully',
-      event
+      event: eventWithAssociations
     });
   } catch (error) {
     console.error('Create event error:', error);
@@ -307,13 +349,13 @@ router.put('/:id/form', [auth, organizerAuth], async (req, res) => {
   try {
     const { registrationForm } = req.body;
     
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findByPk(req.params.id);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Check if user owns this event
-    if (event.organizer.toString() !== req.user._id.toString()) {
+    if (event.organizerId !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -337,13 +379,13 @@ router.put('/:id/payment', [auth, organizerAuth], async (req, res) => {
   try {
     const { paymentRequired, paymentAmount, paymentQR, paymentInstructions } = req.body;
     
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findByPk(req.params.id);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Check if user owns this event
-    if (event.organizer.toString() !== req.user._id.toString()) {
+    if (event.organizerId !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -354,7 +396,7 @@ router.put('/:id/payment', [auth, organizerAuth], async (req, res) => {
     event.isPublished = true; // Publish event after payment setup
 
     console.log('Publishing event:', {
-      id: event._id,
+      id: event.id,
       name: event.name,
       paymentRequired: event.paymentRequired,
       isPublished: event.isPublished
@@ -380,7 +422,10 @@ router.post('/:id/register', auth, async (req, res) => {
   try {
     const { formData, paymentScreenshot } = req.body;
     
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findByPk(req.params.id, {
+      include: [{ model: EventRegistration, as: 'registrations' }]
+    });
+    
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
@@ -390,29 +435,38 @@ router.post('/:id/register', auth, async (req, res) => {
     }
 
     // Check if already registered
-    const existingRegistration = event.registrations.find(
-      reg => reg.user.toString() === req.user._id.toString()
-    );
+    const existingRegistration = await EventRegistration.findOne({
+      where: { 
+        eventId: req.params.id,
+        userId: req.user.id 
+      }
+    });
 
     if (existingRegistration) {
       return res.status(400).json({ message: 'Already registered for this event' });
     }
 
     // Check if event is full
-    if (event.maxParticipants && event.approvedRegistrationsCount >= event.maxParticipants) {
+    const approvedCount = await EventRegistration.count({
+      where: { 
+        eventId: req.params.id,
+        registrationStatus: 'approved' 
+      }
+    });
+
+    if (event.maxParticipants && approvedCount >= event.maxParticipants) {
       return res.status(400).json({ message: 'Event is full' });
     }
 
-    // Add registration
-    event.registrations.push({
-      user: req.user._id,
-      formData: formData ? new Map(Object.entries(formData)) : new Map(),
+    // Create registration
+    await EventRegistration.create({
+      eventId: req.params.id,
+      userId: req.user.id,
+      formData: formData || {},
       paymentScreenshot,
       paymentStatus: paymentScreenshot ? 'pending' : 'verified',
       registrationStatus: 'pending'
     });
-
-    await event.save();
 
     res.json({ message: 'Successfully applied for event. Awaiting organizer approval.' });
   } catch (error) {
@@ -426,19 +480,24 @@ router.post('/:id/register', auth, async (req, res) => {
 // @access  Private (Organizer only)
 router.get('/:id/applications', [auth, organizerAuth], async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id)
-      .populate('registrations.user', 'name email');
+    const event = await Event.findByPk(req.params.id);
 
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Check if user owns this event
-    if (event.organizer.toString() !== req.user._id.toString()) {
+    if (event.organizerId !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    res.json(event.registrations);
+    const registrations = await EventRegistration.findAll({
+      where: { eventId: req.params.id },
+      include: [{ model: User, as: 'user', attributes: ['name', 'email'] }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.json(registrations);
   } catch (error) {
     console.error('Get applications error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -452,19 +511,20 @@ router.put('/:eventId/applications/:applicationId', [auth, organizerAuth], async
   try {
     const { registrationStatus, paymentStatus } = req.body;
     
-    const event = await Event.findById(req.params.eventId)
-      .populate('registrations.user', 'name email');
-
+    const event = await Event.findByPk(req.params.eventId);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Check if user owns this event
-    if (event.organizer.toString() !== req.user._id.toString()) {
+    if (event.organizerId !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const registration = event.registrations.id(req.params.applicationId);
+    const registration = await EventRegistration.findByPk(req.params.applicationId, {
+      include: [{ model: User, as: 'user', attributes: ['name', 'email'] }]
+    });
+    
     if (!registration) {
       return res.status(404).json({ message: 'Application not found' });
     }
@@ -479,7 +539,7 @@ router.put('/:eventId/applications/:applicationId', [auth, organizerAuth], async
       registration.paymentStatus = paymentStatus;
     }
 
-    await event.save();
+    await registration.save();
 
     // Send email notification if registration status changed
     if (registrationStatus && registrationStatus !== oldStatus) {
@@ -513,18 +573,18 @@ router.put('/:eventId/applications/:applicationId', [auth, organizerAuth], async
 // @access  Private (Organizer only)
 router.delete('/:id', [auth, organizerAuth], async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findByPk(req.params.id);
 
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Check if user owns this event
-    if (event.organizer.toString() !== req.user._id.toString()) {
+    if (event.organizerId !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    await Event.findByIdAndDelete(req.params.id);
+    await event.destroy();
 
     res.json({ message: 'Event deleted successfully' });
   } catch (error) {

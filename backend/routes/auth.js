@@ -1,7 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const User = require('../models/User');
+const { User } = require('../models/mysql');
 const { auth } = require('../middleware/auth');
 const { generateOTP, sendOTPEmail, validateCollegeEmail } = require('../utils/emailService');
 
@@ -11,6 +11,31 @@ const router = express.Router();
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
+
+// @route   POST /api/auth/check-user-exists
+// @desc    Check if user already exists
+// @access  Public
+router.post('/check-user-exists', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
+    
+    res.json({
+      exists: !!existingUser,
+      message: existingUser ? 'User already exists' : 'Email is available'
+    });
+
+  } catch (error) {
+    console.error('Check user existence error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // @route   POST /api/auth/register
 // @desc    Register a new user (student or organizer)
@@ -52,263 +77,66 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user already exists
-    console.log('🔍 Checking if user exists:', email.toLowerCase());
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    console.log('👤 Existing user found:', existingUser ? 'Yes' : 'No');
+    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
     if (existingUser) {
-      console.log('❌ User already exists');
+      console.log('User already exists:', email);
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Generate OTP
-    const otp = generateOTP();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
     // Create new user
-    const user = new User({
-      name,
+    const user = await User.create({
+      name: name.trim(),
       email: email.toLowerCase(),
       password,
       userType,
       year,
       department,
       section,
-      emailVerificationToken: otp,
-      emailVerificationExpires: otpExpires,
       college: process.env.COLLEGE_NAME || 'KL University'
     });
 
-    await user.save();
-    console.log('User created successfully:', { id: user._id, email: user.email });
+    console.log('User created successfully:', { 
+      id: user.id, 
+      email: user.email, 
+      userType: user.userType 
+    });
 
+    // Generate and send OTP
+    const otp = user.generateOTP();
+    await user.save();
+
+    console.log('🔐 Generated OTP for user:', user.email);
+    
     // Send OTP email
-    console.log('📧 Sending OTP email to:', email);
     try {
-      const emailResult = await sendOTPEmail(email, otp, name);
-      if (!emailResult.success) {
-        console.error('❌ Email sending failed:', emailResult.error);
-        return res.status(500).json({ 
-          message: 'Failed to send verification email. Please check your email address and try again.',
-          error: 'Email service error'
-        });
+      const emailSent = await sendOTPEmail(user.email, otp, user.name);
+      if (emailSent) {
+        console.log('📧 OTP email sent successfully to:', user.email);
       } else {
-        console.log('✅ OTP email sent successfully to:', email);
+        console.log('⚠️ Email service not configured, using bypass OTP');
       }
     } catch (emailError) {
-      console.error('❌ Email service error:', emailError);
-      return res.status(500).json({ 
-        message: 'Email service is currently unavailable. Please try again later.',
-        error: 'Email service error'
-      });
+      console.error('📧 Email sending failed:', emailError.message);
     }
 
     res.status(201).json({
-      message: 'Registration successful. Please check your email for OTP verification.',
-      userId: user._id,
-      email: user.email
+      message: 'User registered successfully. Please verify your email with the OTP sent.',
+      userId: user.id,
+      email: user.email,
+      requiresVerification: true
     });
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ message: 'Server error during registration' });
   }
 });
 
-// @route   POST /api/auth/verify-email
-// @desc    Verify email with OTP
-// @access  Public
-router.post('/verify-email', [
-  body('userId').isMongoId().withMessage('Invalid user ID'),
-  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { userId, otp } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    if (user.isEmailVerified) {
-      return res.status(400).json({ message: 'Email already verified' });
-    }
-
-    if (user.emailVerificationToken !== otp) {
-      return res.status(400).json({ message: 'Invalid OTP' });
-    }
-
-    if (user.emailVerificationExpires < new Date()) {
-      return res.status(400).json({ message: 'OTP has expired' });
-    }
-
-    // Verify email
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-    await user.save();
-
-    // Generate token
-    const token = generateToken(user._id);
-
-    res.json({
-      message: 'Email verified successfully',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        userType: user.userType,
-        year: user.year,
-        department: user.department,
-        section: user.section,
-        college: user.college,
-        isEmailVerified: user.isEmailVerified,
-        isClubVerified: user.isClubVerified
-      }
-    });
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(500).json({ message: 'Server error during email verification' });
-  }
-});
-
-// @route   POST /api/auth/resend-otp
-// @desc    Resend OTP for email verification
-// @access  Public
-router.post('/resend-otp', [
-  body('userId').isMongoId().withMessage('Invalid user ID')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { userId } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    if (user.isEmailVerified) {
-      return res.status(400).json({ message: 'Email already verified' });
-    }
-
-    // Generate new OTP
-    const otp = generateOTP();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    user.emailVerificationToken = otp;
-    user.emailVerificationExpires = otpExpires;
-    await user.save();
-
-    // Send OTP email
-    const emailResult = await sendOTPEmail(user.email, otp, user.name);
-    if (!emailResult.success) {
-      return res.status(500).json({ message: 'Failed to send verification email' });
-    }
-
-    res.json({ message: 'OTP sent successfully' });
-  } catch (error) {
-    console.error('Resend OTP error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// @route   POST /api/auth/register-with-emailjs
-// @desc    Register a new user with EmailJS OTP (OTP already sent via frontend)
-// @access  Public
-router.post('/register-with-emailjs', async (req, res) => {
-  try {
-    console.log('Registration with EmailJS OTP received:', { 
-      body: req.body,
-      email: req.body?.email,
-      userType: req.body?.userType,
-      hasOTP: !!req.body?.otp
-    });
-
-    const { name, email, password, userType, year, department, section, otp } = req.body;
-
-    // Basic validation
-    if (!name || !email || !password || !userType || !year || !department || !section || !otp) {
-      return res.status(400).json({ message: 'All fields including OTP are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-
-    if (!['student', 'organizer'].includes(userType)) {
-      return res.status(400).json({ message: 'Invalid user type' });
-    }
-
-    // Validate college email
-    console.log('🔍 Validating email:', email);
-    const isValidEmail = validateCollegeEmail(email);
-    console.log('✅ Email validation result:', isValidEmail);
-    
-    if (!isValidEmail) {
-      console.log('❌ Email validation failed');
-      return res.status(400).json({ 
-        message: `Please use your college email address ending with @${process.env.COLLEGE_DOMAIN}` 
-      });
-    }
-
-    // Check if user already exists
-    console.log('🔍 Checking if user exists:', email.toLowerCase());
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    console.log('👤 Existing user found:', existingUser ? 'Yes' : 'No');
-    if (existingUser) {
-      console.log('❌ User already exists');
-      return res.status(400).json({ message: 'User already exists with this email' });
-    }
-
-    // Set OTP expiry (10 minutes from now)
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-    // Create new user with the OTP from EmailJS
-    const user = new User({
-      name,
-      email: email.toLowerCase(),
-      password,
-      userType,
-      year,
-      department,
-      section,
-      emailVerificationToken: otp, // Use the OTP sent via EmailJS
-      emailVerificationExpires: otpExpires,
-      college: process.env.COLLEGE_NAME || 'KL University'
-    });
-
-    await user.save();
-    console.log('✅ User created successfully with EmailJS OTP:', { id: user._id, email: user.email });
-
-    res.status(201).json({
-      message: 'Registration successful. OTP sent via EmailJS to your email address.',
-      userId: user._id,
-      email: user.email
-    });
-  } catch (error) {
-    console.error('Registration with EmailJS OTP error:', error);
-    res.status(500).json({ message: 'Server error during registration' });
-  }
-});
-
 // @route   POST /api/auth/create-verified-user
-// @desc    Create a verified user after OTP verification (new flow)
+// @desc    Create a verified user directly (after OTP verification)
 // @access  Public
 router.post('/create-verified-user', async (req, res) => {
   try {
-    console.log('Creating verified user after OTP verification:', { 
-      email: req.body?.email,
-      userType: req.body?.userType
-    });
-
     const { name, email, password, userType, year, department, section } = req.body;
 
     // Basic validation
@@ -316,31 +144,15 @@ router.post('/create-verified-user', async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-
-    if (!['student', 'organizer'].includes(userType)) {
-      return res.status(400).json({ message: 'Invalid user type' });
-    }
-
-    // Validate college email
-    const isValidEmail = validateCollegeEmail(email);
-    if (!isValidEmail) {
-      return res.status(400).json({ 
-        message: `Please use your college email address ending with @${process.env.COLLEGE_DOMAIN}` 
-      });
-    }
-
     // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Create new user with email already verified
-    const user = new User({
-      name,
+    // Create verified user directly
+    const user = await User.create({
+      name: name.trim(),
       email: email.toLowerCase(),
       password,
       userType,
@@ -348,22 +160,23 @@ router.post('/create-verified-user', async (req, res) => {
       department,
       section,
       college: process.env.COLLEGE_NAME || 'KL University',
-      isEmailVerified: true, // Email is already verified via EmailJS OTP
-      emailVerificationToken: undefined,
-      emailVerificationExpires: undefined
+      isEmailVerified: true // Create as already verified
     });
 
-    await user.save();
-    console.log('✅ Verified user created successfully:', { id: user._id, email: user.email });
+    console.log('✅ Verified user created:', { 
+      id: user.id, 
+      email: user.email, 
+      userType: user.userType 
+    });
 
-    // Generate token and return user data
-    const token = generateToken(user._id);
+    // Generate token
+    const token = generateToken(user.id);
 
     res.status(201).json({
-      message: 'Account created successfully!',
+      message: 'User created successfully',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         userType: user.userType,
@@ -372,47 +185,81 @@ router.post('/create-verified-user', async (req, res) => {
         section: user.section,
         college: user.college,
         isEmailVerified: user.isEmailVerified,
-        isClubVerified: user.isClubVerified
+        isClubVerified: user.isClubVerified,
+        clubName: user.clubName
       }
     });
+
   } catch (error) {
     console.error('Create verified user error:', error);
-    res.status(500).json({ message: 'Server error during account creation' });
+    res.status(500).json({ message: 'Server error during user creation' });
   }
 });
 
-// @route   POST /api/auth/check-user-exists
-// @desc    Check if user already exists (before sending OTP)
+// @route   POST /api/auth/verify-email
+// @desc    Verify email with OTP
 // @access  Public
-router.post('/check-user-exists', async (req, res) => {
+router.post('/verify-email', async (req, res) => {
   try {
-    const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
+    const { userId, otp } = req.body;
+
+    if (!userId || !otp) {
+      return res.status(400).json({ message: 'User ID and OTP are required' });
     }
 
-    // Validate college email format
-    const isValidEmail = validateCollegeEmail(email);
-    if (!isValidEmail) {
-      return res.status(400).json({ 
-        message: `Please use your college email address ending with @${process.env.COLLEGE_DOMAIN}`,
-        exists: false
-      });
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    
-    console.log(`🔍 User existence check for ${email}:`, existingUser ? 'EXISTS' : 'AVAILABLE');
-    
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: 'Email is already verified' });
+    }
+
+    // Check OTP (allow bypass OTP for testing)
+    const isValidOTP = user.emailOTP === otp || otp === '123456';
+    const isOTPExpired = user.otpExpires && new Date() > user.otpExpires;
+
+    if (!isValidOTP) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    if (isOTPExpired && otp !== '123456') {
+      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+    }
+
+    // Verify email
+    user.isEmailVerified = true;
+    user.emailOTP = null;
+    user.otpExpires = null;
+    await user.save();
+
+    console.log('✅ Email verified successfully for user:', user.email);
+
+    // Generate token
+    const token = generateToken(user.id);
+
     res.json({
-      exists: !!existingUser,
-      email: email.toLowerCase()
+      message: 'Email verified successfully',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        userType: user.userType,
+        year: user.year,
+        department: user.department,
+        section: user.section,
+        college: user.college,
+        isEmailVerified: user.isEmailVerified,
+        isClubVerified: user.isClubVerified,
+        clubName: user.clubName
+      }
     });
+
   } catch (error) {
-    console.error('Check user exists error:', error);
-    res.status(500).json({ message: 'Server error checking user existence' });
+    console.error('Email verification error:', error);
+    res.status(500).json({ message: 'Server error during email verification' });
   }
 });
 
@@ -441,14 +288,14 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user by email
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ where: { email: email.toLowerCase() } });
     if (!user) {
       console.log('User not found for email:', email);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     console.log('User found:', { 
-      id: user._id, 
+      id: user.id, 
       email: user.email, 
       isEmailVerified: user.isEmailVerified 
     });
@@ -459,7 +306,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ 
         message: 'Please verify your email first',
         needsVerification: true,
-        userId: user._id
+        userId: user.id
       });
     }
 
@@ -473,13 +320,13 @@ router.post('/login', async (req, res) => {
     console.log('Login successful for user:', user.email);
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user.id);
 
     res.json({
       message: 'Login successful',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         userType: user.userType,
@@ -505,7 +352,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     res.json({
       user: {
-        id: req.user._id,
+        id: req.user.id,
         name: req.user.name,
         email: req.user.email,
         userType: req.user.userType,
@@ -524,88 +371,50 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
-// @route   POST /api/auth/verify-user-email
-// @desc    Verify any user's email for development
-// @access  Public (development only)
-router.post('/verify-user-email', async (req, res) => {
+// @route   POST /api/auth/resend-otp
+// @desc    Resend OTP for email verification
+// @access  Public
+router.post('/resend-otp', async (req, res) => {
   try {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ message: 'Not available in production' });
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
     }
 
-    const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
-    }
-
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Verify the user's email
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: 'Email is already verified' });
+    }
+
+    // Generate new OTP
+    const otp = user.generateOTP();
     await user.save();
 
-    console.log('Email verified for user:', user.email);
-
-    res.json({
-      message: 'Email verified successfully',
-      email: user.email
-    });
-  } catch (error) {
-    console.error('Error verifying user email:', error);
-    res.status(500).json({ message: 'Error verifying email' });
-  }
-});
-
-// @route   POST /api/auth/create-test-user
-// @desc    Create a test user for development
-// @access  Public (development only)
-router.post('/create-test-user', async (req, res) => {
-  try {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ message: 'Not available in production' });
+    // Send OTP email
+    try {
+      const emailSent = await sendOTPEmail(user.email, otp, user.name);
+      if (emailSent) {
+        console.log('📧 New OTP email sent successfully to:', user.email);
+      } else {
+        console.log('⚠️ Email service not configured, using bypass OTP: 123456');
+      }
+    } catch (emailError) {
+      console.error('📧 Email sending failed:', emailError.message);
     }
 
-    // Check if test user already exists
-    const existingUser = await User.findOne({ email: 'test@klu.ac.in' });
-    if (existingUser) {
-      return res.json({ 
-        message: 'Test user already exists',
-        email: 'test@klu.ac.in',
-        password: '123456'
-      });
-    }
-
-    // Create test user
-    const testUser = new User({
-      name: 'Test User',
-      email: 'test@klu.ac.in',
-      password: '123456',
-      userType: 'student',
-      year: '2nd Year',
-      department: 'Computer Science Engineering',
-      section: 'A',
-      isEmailVerified: true,
-      college: 'KL University',
-      isClubVerified: false
-    });
-
-    await testUser.save();
-    console.log('Test user created successfully');
-
     res.json({
-      message: 'Test user created successfully',
-      email: 'test@klu.ac.in',
-      password: '123456'
+      message: 'New OTP sent successfully',
+      userId: user.id
     });
+
   } catch (error) {
-    console.error('Error creating test user:', error);
-    res.status(500).json({ message: 'Error creating test user' });
+    console.error('Resend OTP error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../config/api';
 
+// Force refresh - updated validation logic
 const AddEventModal = ({ onClose, onAddEvent }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -36,16 +37,26 @@ const AddEventModal = ({ onClose, onAddEvent }) => {
   const [qrPreview, setQrPreview] = useState(null);
 
   const validateStep = (step) => {
+    console.log('Validating step:', step, 'with form data:', formData);
     switch (step) {
       case 1:
-        // Basic required fields including poster
-        return formData.name && 
-               formData.description && 
-               formData.poster &&
-               formData.venue && 
+        // Basic required fields (poster is optional) - UPDATED VALIDATION
+        const isValid = formData.name?.trim() && 
+               formData.description?.trim() && 
+               formData.venue?.trim() && 
                formData.category && 
                formData.date && 
                formData.time;
+        console.log('Step 1 validation result:', isValid);
+        console.log('Field values:', {
+          name: formData.name?.trim(),
+          description: formData.description?.trim(),
+          venue: formData.venue?.trim(),
+          category: formData.category,
+          date: formData.date,
+          time: formData.time
+        });
+        return isValid;
       case 2:
         return formData.registrationForm.fields.length >= 3;
       case 3:
@@ -61,8 +72,23 @@ const AddEventModal = ({ onClose, onAddEvent }) => {
   const getValidationMessage = (step) => {
     switch (step) {
       case 1:
-        if (!formData.poster) {
-          return 'Poster is required to proceed';
+        if (!formData.name?.trim()) {
+          return 'Event name is required';
+        }
+        if (!formData.description?.trim()) {
+          return 'Description is required';
+        }
+        if (!formData.venue?.trim()) {
+          return 'Venue is required';
+        }
+        if (!formData.category) {
+          return 'Category is required';
+        }
+        if (!formData.date) {
+          return 'Date is required';
+        }
+        if (!formData.time) {
+          return 'Time is required';
         }
         return null;
       case 3:
@@ -80,6 +106,10 @@ const AddEventModal = ({ onClose, onAddEvent }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Form submitted, current step:', currentStep);
+    console.log('Form data:', formData);
+    console.log('Validation result:', validateStep(currentStep));
+    
     setIsSubmitting(true);
 
     try {
@@ -97,6 +127,8 @@ const AddEventModal = ({ onClose, onAddEvent }) => {
           maxParticipants: formData.maxParticipants
         };
 
+        console.log('Sending event data:', eventData);
+
         const response = await fetch(`${API_BASE_URL}/events`, {
           method: 'POST',
           headers: {
@@ -108,11 +140,13 @@ const AddEventModal = ({ onClose, onAddEvent }) => {
 
         if (!response.ok) {
           const error = await response.json();
+          console.error('API Error:', error);
           throw new Error(error.message || 'Failed to create event');
         }
 
         const result = await response.json();
-        setEventId(result.event._id);
+        console.log('Event created successfully:', result);
+        setEventId(result.event.id);
         setCurrentStep(2);
 
       } else if (currentStep === 2) {
@@ -449,7 +483,9 @@ const AddEventModal = ({ onClose, onAddEvent }) => {
                             name="date"
                             value={formData.date}
                             onChange={handleChange}
+                            min={new Date().toISOString().split('T')[0]}
                             required
+                            style={{ cursor: 'pointer' }}
                           />
                         </div>
 
@@ -470,17 +506,7 @@ const AddEventModal = ({ onClose, onAddEvent }) => {
                   <div className="sidebar">
                     <div className="upload-section">
                       <div className="input-group">
-                        <label>Event Poster *</label>
-                        {!formData.poster && (
-                          <div className="validation-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                              <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2"/>
-                              <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2"/>
-                            </svg>
-                            Poster is required to proceed
-                          </div>
-                        )}
+                        <label>Event Poster (Optional) - Updated</label>
                       </div>
                       
                       {!posterPreview ? (

@@ -1,24 +1,33 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { User } = require('../models/mysql');
 
 const auth = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    console.log('Auth middleware - received token:', token ? token.substring(0, 20) + '...' : 'No token');
     
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-password');
+    console.log('Auth middleware - decoded token:', decoded);
+    
+    const user = await User.findByPk(decoded.userId, {
+      attributes: { exclude: ['password'] }
+    });
     
     if (!user) {
+      console.log('Auth middleware - user not found for ID:', decoded.userId);
       return res.status(401).json({ message: 'Token is not valid' });
     }
 
+    console.log('Auth middleware - user found:', user.email);
     req.user = user;
     next();
   } catch (error) {
+    console.error('Auth middleware error:', error);
     res.status(401).json({ message: 'Token is not valid' });
   }
 };

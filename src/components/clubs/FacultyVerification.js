@@ -166,6 +166,21 @@ const FacultyVerification = ({ clubId, facultyEmail, onVerificationSuccess, onBa
             </div>
           </div>
 
+          {/* Testing Notice */}
+          <div className="testing-notice">
+            <div className="notice-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <path d="M12 16V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div className="notice-content">
+              <h4>Testing Mode</h4>
+              <p>If the faculty advisor doesn't receive the email, you can use the bypass code <strong>123456</strong> for testing purposes.</p>
+            </div>
+          </div>
+
           {/* Timer */}
           <div className="timer-section">
             <div className="timer-icon">

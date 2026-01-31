@@ -1,29 +1,56 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
-const Event = require('../models/Event');
-const Club = require('../models/Club');
+const { User, Event, Club, EventRegistration } = require('../models/mysql');
 const { auth } = require('../middleware/auth');
 
 // Get user profile
 router.get('/', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id)
-      .populate('eventsRegistered.eventId', 'title category date')
-      .populate('eventsWon.eventId', 'title category date')
-      .populate('favoriteClubs', 'name description logo')
-      .populate('eventsCreated.eventId', 'title category date attendees')
-      .select('-password -emailVerificationToken');
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['password', 'emailOTP', 'otpExpires'] }
+    });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Get user's registered events
+    const registrations = await EventRegistration.findAll({
+      where: { userId: req.user.id },
+      include: [{ model: Event, as: 'event', attributes: ['name', 'category', 'date'] }]
+    });
+
+    // Get user's created events (for organizers)
+    let createdEvents = [];
+    if (user.userType === 'organizer') {
+      createdEvents = await Event.findAll({
+        where: { organizerId: req.user.id },
+        attributes: ['name', 'category', 'date'],
+        include: [{ model: EventRegistration, as: 'registrations' }]
+      });
+    }
+
     // Calculate additional stats
-    const profileStats = await calculateProfileStats(user);
+    const profileStats = await calculateProfileStats(user, registrations, createdEvents);
 
     res.json({
-      user,
+      user: {
+        ...user.toJSON(),
+        eventsRegistered: registrations.map(reg => ({
+          eventId: reg.event.id,
+          title: reg.event.name,
+          category: reg.event.category,
+          date: reg.event.date,
+          registeredAt: reg.createdAt
+        })),
+        eventsCreated: createdEvents.map(event => ({
+          eventId: event.id,
+          title: event.name,
+          category: event.category,
+          date: event.date,
+          attendees: event.registrations.filter(reg => reg.registrationStatus === 'approved').length
+        }))
+      },
       stats: profileStats
     });
   } catch (error) {
@@ -41,7 +68,7 @@ router.put('/', auth, async (req, res) => {
       socialLinks
     } = req.body;
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findByPk(req.user.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -63,24 +90,27 @@ router.put('/', auth, async (req, res) => {
 // Add event to user's registered events
 router.post('/register-event/:eventId', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    const event = await Event.findById(req.params.eventId);
+    const user = await User.findByPk(req.user.id);
+    const event = await Event.findByPk(req.params.eventId);
 
     if (!user || !event) {
       return res.status(404).json({ message: 'User or event not found' });
     }
 
     // Check if already registered
-    const alreadyRegistered = user.eventsRegistered.some(
-      reg => reg.eventId.toString() === req.params.eventId
-    );
+    const existingRegistration = await EventRegistration.findOne({
+      where: {
+        userId: req.user.id,
+        eventId: req.params.eventId
+      }
+    });
 
-    if (!alreadyRegistered) {
-      user.eventsRegistered.push({
+    if (!existingRegistration) {
+      await EventRegistration.create({
+        userId: req.user.id,
         eventId: req.params.eventId,
-        registeredAt: new Date()
+        registrationStatus: 'pending'
       });
-      await user.save();
     }
 
     res.json({ message: 'Event registered successfully' });
@@ -93,33 +123,23 @@ router.post('/register-event/:eventId', auth, async (req, res) => {
 // Mark event as won
 router.post('/win-event/:eventId', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findByPk(req.user.id);
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if already marked as won
-    const alreadyWon = user.eventsWon.some(
-      win => win.eventId.toString() === req.params.eventId
-    );
-
-    if (!alreadyWon) {
-      user.eventsWon.push({
-        eventId: req.params.eventId,
-        wonAt: new Date()
-      });
-
-      // Add achievement for first win
-      if (user.eventsWon.length === 1) {
-        user.achievements.push({
-          title: 'First Victory',
-          description: 'Won your first event!',
-          icon: '🏆'
-        });
+    // Update the registration to mark as won
+    const registration = await EventRegistration.findOne({
+      where: {
+        userId: req.user.id,
+        eventId: req.params.eventId
       }
+    });
 
-      await user.save();
+    if (registration) {
+      registration.isWinner = true;
+      await registration.save();
     }
 
     res.json({ message: 'Event marked as won' });
@@ -132,19 +152,20 @@ router.post('/win-event/:eventId', auth, async (req, res) => {
 // Add club to favorites
 router.post('/favorite-club/:clubId', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findByPk(req.user.id);
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     const clubId = req.params.clubId;
-    const isFavorite = user.favoriteClubs.includes(clubId);
+    const favoriteClubs = user.favoriteClubs || [];
+    const isFavorite = favoriteClubs.includes(clubId);
 
     if (isFavorite) {
-      user.favoriteClubs = user.favoriteClubs.filter(id => id.toString() !== clubId);
+      user.favoriteClubs = favoriteClubs.filter(id => id !== clubId);
     } else {
-      user.favoriteClubs.push(clubId);
+      user.favoriteClubs = [...favoriteClubs, clubId];
     }
 
     await user.save();
@@ -160,11 +181,11 @@ router.post('/favorite-club/:clubId', auth, async (req, res) => {
 });
 
 // Get profile statistics
-async function calculateProfileStats(user) {
+async function calculateProfileStats(user, registrations = [], createdEvents = []) {
   const stats = {
-    totalEventsRegistered: user.eventsRegistered.length,
-    totalEventsWon: user.eventsWon.length,
-    totalFavoriteClubs: user.favoriteClubs.length,
+    totalEventsRegistered: registrations.length,
+    totalEventsWon: registrations.filter(reg => reg.isWinner).length,
+    totalFavoriteClubs: (user.favoriteClubs || []).length,
     winRate: 0,
     mostActiveMonth: null,
     recentActivity: []
@@ -176,22 +197,26 @@ async function calculateProfileStats(user) {
   }
 
   // Find most active month
-  if (user.eventsRegistered.length > 0) {
+  if (registrations.length > 0) {
     const monthCounts = {};
-    user.eventsRegistered.forEach(reg => {
-      const month = new Date(reg.registeredAt).toLocaleString('default', { month: 'long', year: 'numeric' });
+    registrations.forEach(reg => {
+      const month = new Date(reg.createdAt).toLocaleString('default', { month: 'long', year: 'numeric' });
       monthCounts[month] = (monthCounts[month] || 0) + 1;
     });
     
-    stats.mostActiveMonth = Object.keys(monthCounts).reduce((a, b) => 
-      monthCounts[a] > monthCounts[b] ? a : b
-    );
+    if (Object.keys(monthCounts).length > 0) {
+      stats.mostActiveMonth = Object.keys(monthCounts).reduce((a, b) => 
+        monthCounts[a] > monthCounts[b] ? a : b
+      );
+    }
   }
 
   // For organizers, calculate additional stats
   if (user.userType === 'organizer') {
-    stats.totalEventsCreated = user.eventsCreated.length;
-    stats.totalParticipants = user.totalParticipants;
+    stats.totalEventsCreated = createdEvents.length;
+    stats.totalParticipants = createdEvents.reduce((total, event) => {
+      return total + (event.registrations ? event.registrations.filter(reg => reg.registrationStatus === 'approved').length : 0);
+    }, 0);
     
     // Calculate average participants per event
     if (stats.totalEventsCreated > 0) {

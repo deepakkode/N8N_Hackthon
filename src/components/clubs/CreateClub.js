@@ -170,9 +170,9 @@ const CreateClub = ({ onBack, onClubCreated }) => {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/clubs/create`, {
-        clubName: formData.clubName,
-        clubDescription: formData.clubDescription,
-        clubLogo: formData.clubLogo,
+        name: formData.clubName,
+        description: formData.clubDescription,
+        logo: formData.clubLogo,
         facultyName: formData.facultyName,
         facultyEmail: formData.facultyEmail,
         facultyDepartment: formData.facultyDepartment
