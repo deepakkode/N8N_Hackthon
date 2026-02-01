@@ -64,16 +64,35 @@ cd backend && npm start
 
 ## 🐛 Common Issues & Solutions
 
-### Issue 1: "Module not found" errors
+### Issue 1: MySQL Connection Error
+**Error:** `Access denied for user 'root'@'localhost'`
+**Solution:** 
+1. Update `backend/.env` with your MySQL password:
+   ```
+   DB_PASSWORD=your_mysql_password_here
+   ```
+2. Or create a new MySQL user:
+   ```sql
+   CREATE USER 'vivento_user'@'localhost' IDENTIFIED BY 'vivento123';
+   GRANT ALL PRIVILEGES ON *.* TO 'vivento_user'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+3. Initialize database: `cd backend && node scripts/init-database.js --with-test-data`
+
+### Issue 2: Email Service Error
+**Error:** `Authentication failed: 535 5.7.8`
+**Solution:** The app works without email! Email is optional. Uses bypass OTP: 123456
+
+### Issue 3: "Module not found" errors
 **Solution:** Clear node_modules and reinstall dependencies (see step 2 above)
 
-### Issue 2: Old UI still showing
+### Issue 4: Old UI still showing
 **Solution:** Hard refresh browser cache (see step 3 above)
 
-### Issue 3: Console errors about missing props
+### Issue 5: Console errors about missing props
 **Solution:** Restart development server (see step 4 above)
 
-### Issue 4: Profile button not showing
+### Issue 6: Profile button not showing
 **Solution:** 
 1. Check if you're logged in
 2. Hard refresh the page
