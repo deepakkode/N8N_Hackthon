@@ -1,5 +1,6 @@
 const { testConnection, syncDatabase } = require('../config/database');
 const { User, Event, Club, EventRegistration } = require('../models/mysql');
+const { createTestUsers } = require('./create-test-users');
 
 console.log('🚀 Initializing Vivento Events Database...');
 
@@ -21,6 +22,22 @@ const initializeDatabase = async () => {
     console.log('   - events (Campus events)');
     console.log('   - event_registrations (Event registrations)');
     console.log('');
+    
+    // Check if user wants to create test data
+    const args = process.argv.slice(2);
+    const createTestData = args.includes('--with-test-data') || args.includes('-t');
+    
+    if (createTestData) {
+      console.log('🔄 Creating test users and sample data...');
+      await createTestUsers();
+      console.log('');
+    } else {
+      console.log('💡 Tip: To create test users for development, run:');
+      console.log('   node scripts/init-database.js --with-test-data');
+      console.log('   or use: create-test-users.bat');
+      console.log('');
+    }
+    
     console.log('🎉 Your Vivento Events database is ready!');
     
     process.exit(0);

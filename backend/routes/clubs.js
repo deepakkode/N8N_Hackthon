@@ -296,6 +296,45 @@ router.post('/resend-faculty-otp', async (req, res) => {
   }
 });
 
+// @route   GET /api/clubs/debug
+// @desc    Debug endpoint to see all clubs (development only)
+// @access  Private
+router.get('/debug', auth, async (req, res) => {
+  try {
+    console.log('🔍 Debug: Fetching ALL clubs for user:', req.user.email);
+    
+    const allClubs = await Club.findAll({
+      include: [{ model: User, as: 'organizer', attributes: ['name', 'email', 'department', 'year'] }],
+      order: [['createdAt', 'DESC']]
+    });
+
+    console.log(`🔍 Debug: Found ${allClubs.length} total clubs in database`);
+    
+    const debugInfo = allClubs.map(club => ({
+      id: club.id,
+      name: club.name,
+      organizerEmail: club.organizerEmail,
+      isFacultyVerified: club.isFacultyVerified,
+      isActive: club.isActive,
+      isApproved: club.isApproved,
+      createdAt: club.createdAt,
+      organizer: club.organizer
+    }));
+
+    res.json({
+      totalClubs: allClubs.length,
+      clubs: debugInfo,
+      currentUser: {
+        email: req.user.email,
+        userType: req.user.userType
+      }
+    });
+  } catch (error) {
+    console.error('Debug clubs error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // @route   GET /api/clubs
 // @desc    Get all approved clubs
 // @access  Private
@@ -307,6 +346,7 @@ router.get('/', auth, async (req, res) => {
       where: {
         isFacultyVerified: true,
         isActive: true
+        // Removed isApproved requirement for now since it defaults to false
       },
       include: [{ model: User, as: 'organizer', attributes: ['name', 'email', 'department', 'year'] }],
       order: [['createdAt', 'DESC']]
@@ -314,21 +354,33 @@ router.get('/', auth, async (req, res) => {
 
     console.log(`📊 Found ${clubs.length} verified clubs`);
     
+    // Log each club for debugging
+    clubs.forEach(club => {
+      console.log(`Club: ${club.name}, Faculty Verified: ${club.isFacultyVerified}, Active: ${club.isActive}, Approved: ${club.isApproved}`);
+    });
+    
     // Transform the data to match frontend expectations
     const transformedClubs = clubs.map(club => ({
       id: club.id,
       _id: club.id, // For compatibility with frontend
       name: club.name,
+      clubName: club.name, // For compatibility with ClubCard component
       description: club.description,
+      clubDescription: club.description, // For compatibility with ClubCard component
       logo: club.logo,
+      clubLogo: club.logo, // For compatibility with ClubCard component
       category: club.category,
-      totalMembers: club.totalMembers,
-      totalEvents: club.totalEvents,
+      totalMembers: club.totalMembers || 0,
+      memberCount: club.totalMembers || 0, // For compatibility with ClubCard component
+      totalEvents: club.totalEvents || 0,
+      eventCount: club.totalEvents || 0, // For compatibility with ClubCard component
       organizer: club.organizer,
       createdAt: club.createdAt,
-      isFacultyVerified: club.isFacultyVerified
+      isFacultyVerified: club.isFacultyVerified,
+      isActive: club.isActive
     }));
 
+    console.log('📤 Sending transformed clubs:', transformedClubs.length);
     res.json(transformedClubs);
   } catch (error) {
     console.error('Get clubs error:', error);

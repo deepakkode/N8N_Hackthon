@@ -12,6 +12,11 @@ import MyEventsPage from './components/events/MyEventsPage';
 import ClubsPage from './components/clubs/ClubsPage';
 import ProfilePage from './components/profile/ProfilePage';
 import EventCard from './components/events/EventCard';
+import EventsManagement from './components/events/EventsManagement';
+import EventCalendar from './components/calendar/EventCalendar';
+import CommunicationHub from './components/communication/CommunicationHub';
+import pwaService from './services/pwaService';
+import notificationService from './services/notificationService';
 
 // Organizer My Events Component
 const OrganizerMyEvents = ({ user }) => {
@@ -614,6 +619,31 @@ const StudentDashboard = ({ hideHeader = false, parentActiveTab = null, onParent
           <MyEventsPage user={user} userType={user?.userType} />
         )}
 
+        {activeTab === 'calendar' && (
+          <div className="calendar-section">
+            <div className="section-header">
+              <h2>Event Calendar</h2>
+              <p>View all events in a beautiful calendar layout</p>
+            </div>
+            <EventCalendar 
+              events={events}
+              user={user}
+              onEventClick={(event) => {
+                // Handle event click - could open event details modal
+                console.log('Event clicked:', event);
+              }}
+              onDateClick={(date, dayEvents) => {
+                // Handle date click - could filter events by date
+                console.log('Date clicked:', date, 'Events:', dayEvents);
+              }}
+            />
+          </div>
+        )}
+
+        {activeTab === 'communication' && (
+          <CommunicationHub user={user} />
+        )}
+
         {activeTab === 'clubs' && (
           <ClubsPage user={user} />
         )}
@@ -648,6 +678,19 @@ const AppContent = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [clubs, setClubs] = useState([]);
+  const [selectedCampus, setSelectedCampus] = useState(null);
+
+  // Handle campus change
+  const handleCampusChange = (campus) => {
+    setSelectedCampus(campus);
+    console.log('Campus changed to:', campus);
+    
+    // Refresh data for the new campus
+    if (user && user.isEmailVerified) {
+      fetchEvents();
+      fetchClubs();
+    }
+  };
 
   // Fetch events from API
   const fetchEvents = async () => {
@@ -765,6 +808,9 @@ const AppContent = () => {
     if (user && user.isEmailVerified) {
       fetchEvents();
       fetchClubs();
+      
+      // Initialize notification service
+      notificationService.init(user);
     }
   }, [user]);
 
@@ -817,6 +863,29 @@ const AppContent = () => {
           />
         ) : activeTab === 'my-events' ? (
           <MyEventsPage user={user} />
+        ) : activeTab === 'events-management' ? (
+          <EventsManagement user={user} />
+        ) : activeTab === 'calendar' ? (
+          <div className="calendar-section">
+            <div className="section-header">
+              <h2>Event Calendar</h2>
+              <p>View all events in a beautiful calendar layout</p>
+            </div>
+            <EventCalendar 
+              events={events}
+              user={user}
+              onEventClick={(event) => {
+                // Handle event click - could open event details modal
+                console.log('Event clicked:', event);
+              }}
+              onDateClick={(date, dayEvents) => {
+                // Handle date click - could filter events by date
+                console.log('Date clicked:', date, 'Events:', dayEvents);
+              }}
+            />
+          </div>
+        ) : activeTab === 'communication' ? (
+          <CommunicationHub user={user} />
         ) : activeTab === 'clubs' ? (
           <ClubsPage user={user} />
         ) : activeTab === 'profile' ? (

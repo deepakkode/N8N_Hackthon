@@ -3,17 +3,22 @@ import React from 'react';
 const ClubCard = ({ club, currentUser, onViewEvents }) => {
   const handleViewEvents = () => {
     if (onViewEvents) {
-      onViewEvents(club._id);
+      onViewEvents(club._id || club.id);
     }
   };
+
+  // Handle both API data structure and demo data structure
+  const clubName = club.clubName || club.name;
+  const clubDescription = club.clubDescription || club.description;
+  const clubLogo = club.clubLogo || club.logo;
 
   return (
     <div className="club-card">
       <div className="club-header">
-        {club.clubLogo ? (
+        {clubLogo ? (
           <img 
-            src={club.clubLogo} 
-            alt={`${club.clubName} logo`}
+            src={clubLogo} 
+            alt={`${clubName} logo`}
             className="club-logo"
             onError={(e) => {
               e.target.style.display = 'none';
@@ -23,7 +28,7 @@ const ClubCard = ({ club, currentUser, onViewEvents }) => {
         ) : null}
         <div 
           className="club-logo-placeholder"
-          style={{ display: club.clubLogo ? 'none' : 'flex' }}
+          style={{ display: clubLogo ? 'none' : 'flex' }}
         >
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
@@ -34,9 +39,9 @@ const ClubCard = ({ club, currentUser, onViewEvents }) => {
       </div>
 
       <div className="club-content">
-        <h3 className="club-name">{club.clubName}</h3>
+        <h3 className="club-name">{clubName}</h3>
         
-        <p className="club-description">{club.clubDescription}</p>
+        <p className="club-description">{clubDescription}</p>
         
         <div className="club-details">
           <div className="club-organizer">
@@ -57,11 +62,11 @@ const ClubCard = ({ club, currentUser, onViewEvents }) => {
 
         <div className="club-stats">
           <div className="stat-item">
-            <span className="stat-number">{club.eventCount || 0}</span>
+            <span className="stat-number">{club.eventCount || club.totalEvents || 0}</span>
             <span className="stat-label">Events</span>
           </div>
           <div className="stat-item">
-            <span className="stat-number">{club.memberCount || 0}</span>
+            <span className="stat-number">{club.memberCount || club.totalMembers || 0}</span>
             <span className="stat-label">Members</span>
           </div>
         </div>

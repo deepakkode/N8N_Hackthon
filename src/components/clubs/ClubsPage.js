@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../../config/api';
 import ClubCard from './ClubCard';
 import CreateClub from './CreateClub';
+import EventCard from '../events/EventCard';
 import './ClubsPage.css';
 
 const ClubsPage = ({ user }) => {
@@ -12,6 +13,10 @@ const ClubsPage = ({ user }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [showCreateClub, setShowCreateClub] = useState(false);
+  const [showEventsModal, setShowEventsModal] = useState(false);
+  const [selectedClub, setSelectedClub] = useState(null);
+  const [clubEvents, setClubEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   useEffect(() => {
     fetchClubs();
@@ -23,11 +28,8 @@ const ClubsPage = ({ user }) => {
       const token = localStorage.getItem('token');
       
       if (!token) {
-        console.log('No token available, using demo data');
-        const demoClubs = getDemoClubs();
-        console.log('Demo clubs:', demoClubs);
-        setClubs(demoClubs);
-        setError('');
+        setClubs([]);
+        setError('Please log in to view clubs');
         setLoading(false);
         return;
       }
@@ -36,89 +38,33 @@ const ClubsPage = ({ user }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      console.log('Fetched clubs:', response.data);
+      console.log('✅ Loaded', response.data?.length || 0, 'clubs from API');
       
-      // If API returns empty array or no clubs, use demo data
-      if (!response.data || response.data.length === 0) {
-        console.log('No clubs from API, using demo data');
-        const demoClubs = getDemoClubs();
-        console.log('Demo clubs:', demoClubs);
-        setClubs(demoClubs);
-      } else {
-        setClubs(response.data);
-      }
+      // Only use real API data - no demo data fallback
+      setClubs(response.data || []);
       setError('');
     } catch (error) {
-      console.error('Error fetching clubs:', error);
-      console.log('API failed, using demo data');
-      const demoClubs = getDemoClubs();
-      console.log('Demo clubs:', demoClubs);
-      setClubs(demoClubs);
-      setError('');
+      console.error('❌ Error fetching clubs:', error.response?.data?.message || error.message);
+      
+      // Don't use demo data - show the actual error
+      setClubs([]);
+      setError(`Failed to load clubs: ${error.response?.data?.message || error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const getDemoClubs = () => [
-    {
-      _id: 'demo-club-1',
-      clubName: 'Tech Innovation Club',
-      clubDescription: 'Exploring cutting-edge technology and innovation through projects, workshops, and competitions. Join us for hackathons, coding sessions, and tech talks.',
-      organizer: { name: 'Dr. Smith', department: 'Computer Science' },
-      eventCount: 8,
-      memberCount: 45,
-      clubLogo: null,
-      isActive: true
-    },
-    {
-      _id: 'demo-club-2',
-      clubName: 'Cultural Society',
-      clubDescription: 'Celebrating arts, culture, and traditions through various cultural events and performances. Experience diverse cultures and artistic expressions.',
-      organizer: { name: 'Prof. Johnson', department: 'Arts & Literature' },
-      eventCount: 12,
-      memberCount: 67,
-      clubLogo: null,
-      isActive: true
-    },
-    {
-      _id: 'demo-club-3',
-      clubName: 'Sports Club',
-      clubDescription: 'Promoting fitness and competitive sports across various disciplines. Join us for tournaments, training sessions, and fitness activities.',
-      organizer: { name: 'Coach Williams', department: 'Physical Education' },
-      eventCount: 15,
-      memberCount: 89,
-      clubLogo: null,
-      isActive: true
-    },
-    {
-      _id: 'demo-club-4',
-      clubName: 'Photography Club',
-      clubDescription: 'Capturing moments and exploring the art of photography. Learn techniques, share your work, and participate in photo walks.',
-      organizer: { name: 'Ms. Davis', department: 'Fine Arts' },
-      eventCount: 6,
-      memberCount: 32,
-      clubLogo: null,
-      isActive: true
-    },
-    {
-      _id: 'demo-club-5',
-      clubName: 'Debate Society',
-      clubDescription: 'Enhancing communication skills and critical thinking through structured debates and public speaking events.',
-      organizer: { name: 'Prof. Brown', department: 'English Literature' },
-      eventCount: 10,
-      memberCount: 28,
-      clubLogo: null,
-      isActive: true
-    }
-  ];
-
   const getFilteredClubs = () => {
     return clubs.filter(club => {
-      const matchesSearch = club.clubName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          club.clubDescription?.toLowerCase().includes(searchTerm.toLowerCase());
+      const clubName = club.clubName || club.name || '';
+      const clubDescription = club.clubDescription || club.description || '';
+      const organizerDepartment = club.organizer?.department || '';
+      
+      const matchesSearch = clubName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          clubDescription.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesDepartment = selectedDepartment === 'all' || 
-                              club.organizer?.department?.toLowerCase().includes(selectedDepartment.toLowerCase());
+                              organizerDepartment.toLowerCase().includes(selectedDepartment.toLowerCase());
+      
       return matchesSearch && matchesDepartment;
     });
   };
@@ -133,6 +79,37 @@ const ClubsPage = ({ user }) => {
     const totalEvents = clubs.reduce((sum, club) => sum + (club.eventCount || 0), 0);
     const departments = getDepartments().length;
     return { totalClubs: clubs.length, totalMembers, totalEvents, departments };
+  };
+
+  const handleViewEvents = async (clubId) => {
+    console.log('Loading events for club:', clubId);
+    const club = clubs.find(club => (club.id || club._id) === clubId);
+    setSelectedClub(club);
+    setShowEventsModal(true);
+    setEventsLoading(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      // Try to fetch events for this specific club
+      const response = await axios.get(`${API_BASE_URL}/events`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Filter events by club organizer
+      const clubSpecificEvents = response.data.filter(event => 
+        event.organizerId === clubId || 
+        event.organizer?.id === clubId ||
+        event.organizer?._id === clubId
+      );
+      
+      console.log('Found', clubSpecificEvents.length, 'events for club:', club?.name || club?.clubName);
+      setClubEvents(clubSpecificEvents);
+    } catch (error) {
+      console.error('Error fetching club events:', error);
+      setClubEvents([]);
+    } finally {
+      setEventsLoading(false);
+    }
   };
 
   const handleClubCreated = () => {
@@ -154,11 +131,6 @@ const ClubsPage = ({ user }) => {
   const stats = getStats();
   const filteredClubs = getFilteredClubs();
   const departments = getDepartments();
-
-  // Debug logging
-  console.log('ClubsPage render - clubs:', clubs);
-  console.log('ClubsPage render - filteredClubs:', filteredClubs);
-  console.log('ClubsPage render - loading:', loading);
 
   return (
     <div className="clubs-page">
@@ -296,7 +268,35 @@ const ClubsPage = ({ user }) => {
       <div className="content-section">
         {error && <div className="error-banner">{error}</div>}
         
-        {filteredClubs.length === 0 ? (
+        {filteredClubs.length === 0 && clubs.length > 0 ? (
+          <div className="no-content">
+            <div className="no-content-icon">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+                <path d="M23 21V19C23 18.1645 22.7155 17.3541 22.2094 16.7018C21.7033 16.0494 20.9944 15.5901 20.2 15.3954" stroke="currentColor" strokeWidth="2"/>
+                <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89317 18.7122 8.75608 18.1676 9.45768C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            </div>
+            <h3>Clubs found but filtered out</h3>
+            <p>
+              Found {clubs.length} club(s) in the database but they don't match your current filters.
+              {searchTerm && ` Search: "${searchTerm}"`}
+              {selectedDepartment !== 'all' && ` Department: "${selectedDepartment}"`}
+            </p>
+            <div style={{ marginTop: '1rem' }}>
+              <button 
+                className="btn btn-primary"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedDepartment('all');
+                }}
+              >
+                Clear All Filters
+              </button>
+            </div>
+          </div>
+        ) : filteredClubs.length === 0 ? (
           <div className="no-content">
             <div className="no-content-icon">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
@@ -318,9 +318,10 @@ const ClubsPage = ({ user }) => {
           <div className="clubs-grid">
             {filteredClubs.map(club => (
               <ClubCard
-                key={club._id}
+                key={club._id || club.id}
                 club={club}
                 currentUser={user}
+                onViewEvents={handleViewEvents}
               />
             ))}
           </div>
@@ -335,6 +336,56 @@ const ClubsPage = ({ user }) => {
               onClose={() => setShowCreateClub(false)}
               onClubCreated={handleClubCreated}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Club Events Modal */}
+      {showEventsModal && (
+        <div className="modal-overlay">
+          <div className="events-modal">
+            <div className="modal-header">
+              <h2>Events from {selectedClub?.name || selectedClub?.clubName}</h2>
+              <button 
+                className="close-btn" 
+                onClick={() => setShowEventsModal(false)}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2"/>
+                  <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              {eventsLoading ? (
+                <div className="loading-container">
+                  <div className="loading-spinner"></div>
+                  <p>Loading events...</p>
+                </div>
+              ) : clubEvents.length === 0 ? (
+                <div className="no-events">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                  <h3>No events found</h3>
+                  <p>This club hasn't organized any events yet.</p>
+                </div>
+              ) : (
+                <div className="events-grid">
+                  {clubEvents.map(event => (
+                    <EventCard
+                      key={event.id || event._id}
+                      event={event}
+                      currentUser={user}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

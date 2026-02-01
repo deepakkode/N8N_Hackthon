@@ -410,3 +410,104 @@
     font-size: 1.5rem;
   }
 }
+/* Events Modal */
+.events-modal {
+  background: white;
+  border-radius: 20px;
+  max-width: 1200px;
+  width: 95%;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.events-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem 2rem 1rem;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.events-modal .modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.events-modal .close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+  color: white;
+}
+
+.events-modal .close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.events-modal .modal-body {
+  padding: 2rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.events-modal .events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(800px, 1fr));
+  gap: 2rem;
+}
+
+.events-modal .no-events {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #666;
+}
+
+.events-modal .no-events svg {
+  margin-bottom: 1rem;
+  opacity: 0.6;
+}
+
+.events-modal .no-events h3 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.events-modal .no-events p {
+  opacity: 0.8;
+  font-size: 1.1rem;
+}
+
+.events-modal .loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #666;
+}
+
+/* Mobile Responsiveness for Events Modal */
+@media (max-width: 768px) {
+  .events-modal {
+    width: 95%;
+    margin: 1rem;
+  }
+  
+  .events-modal .modal-header,
+  .events-modal .modal-body {
+    padding: 1.5rem;
+  }
+  
+  .events-modal .events-grid {
+    grid-template-columns: 1fr;
+  }
+}

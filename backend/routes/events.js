@@ -13,7 +13,7 @@ router.get('/debug', auth, async (req, res) => {
   try {
     const events = await Event.findAll({
       include: [
-        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] },
         { model: Club, as: 'club', attributes: ['name'] }
       ],
       order: [['createdAt', 'DESC']],
@@ -67,7 +67,7 @@ router.get('/', auth, async (req, res) => {
         isActive: true 
       },
       include: [
-        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] },
         { model: Club, as: 'club', attributes: ['name'] },
         { 
           model: EventRegistration, 
@@ -114,7 +114,7 @@ router.get('/my-events', auth, async (req, res) => {
         model: Event,
         as: 'event',
         include: [
-          { model: User, as: 'organizer', attributes: ['name', 'email'] },
+          { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] },
           { model: Club, as: 'club', attributes: ['name'] }
         ]
       }],
@@ -147,7 +147,7 @@ router.get('/organizer/my-events', [auth, organizerAuth], async (req, res) => {
     const events = await Event.findAll({
       where: { organizerId: req.user.id },
       include: [
-        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] },
         { model: Club, as: 'club', attributes: ['name'] },
         { 
           model: EventRegistration, 
@@ -172,7 +172,7 @@ router.get('/:id', auth, async (req, res) => {
   try {
     const event = await Event.findByPk(req.params.id, {
       include: [
-        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] },
         { model: Club, as: 'club', attributes: ['name'] },
         { 
           model: EventRegistration, 
@@ -325,7 +325,7 @@ router.post('/', [auth, organizerAuth], async (req, res) => {
     // Load the event with associations
     const eventWithAssociations = await Event.findByPk(event.id, {
       include: [
-        { model: User, as: 'organizer', attributes: ['name', 'email'] },
+        { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] },
         { model: Club, as: 'club', attributes: ['name'] }
       ]
     });
@@ -509,7 +509,7 @@ router.get('/:id/applications', [auth, organizerAuth], async (req, res) => {
   }
 });
 
-// @route   PUT /api/events/:eventId/applications/:applicationId
+// @route   GET /api/events/:eventId/applications/:applicationId
 // @desc    Update application status
 // @access  Private (Organizer only)
 router.put('/:eventId/applications/:applicationId', [auth, organizerAuth], async (req, res) => {
@@ -570,6 +570,138 @@ router.put('/:eventId/applications/:applicationId', [auth, organizerAuth], async
   } catch (error) {
     console.error('Update application error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/events/:eventId/attendance/:registrationId
+// @desc    Mark/unmark attendance for a registration
+// @access  Private (Organizer only)
+router.put('/:eventId/attendance/:registrationId', [auth, organizerAuth], async (req, res) => {
+  try {
+    const { attended, attendedAt } = req.body;
+    
+    const event = await Event.findByPk(req.params.eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Check if user owns this event
+    if (event.organizerId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const registration = await EventRegistration.findByPk(req.params.registrationId, {
+      include: [{ model: User, as: 'user', attributes: ['name', 'email'] }]
+    });
+    
+    if (!registration) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+
+    // Update attendance
+    registration.attended = attended;
+    registration.attendedAt = attended ? (attendedAt || new Date()) : null;
+    await registration.save();
+
+    console.log(`✅ Attendance ${attended ? 'marked' : 'removed'} for ${registration.user?.name}`);
+
+    res.json({ 
+      message: `Attendance ${attended ? 'marked' : 'removed'} successfully`,
+      registration: {
+        id: registration.id,
+        attended: registration.attended,
+        attendedAt: registration.attendedAt
+      }
+    });
+  } catch (error) {
+    console.error('Update attendance error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/events/:eventId/scan-qr
+// @desc    Process QR code scan for attendance
+// @access  Private (Organizer only)
+router.post('/:eventId/scan-qr', [auth, organizerAuth], async (req, res) => {
+  try {
+    const { qrData } = req.body;
+    
+    // Parse QR code data
+    let qrInfo;
+    try {
+      qrInfo = JSON.parse(qrData);
+    } catch (parseError) {
+      return res.status(400).json({ message: 'Invalid QR code format' });
+    }
+
+    const { eventId, userId, registrationId, timestamp } = qrInfo;
+    
+    // Verify QR code is for this event
+    if (parseInt(eventId) !== parseInt(req.params.eventId)) {
+      return res.status(400).json({ message: 'QR code is not for this event' });
+    }
+
+    const event = await Event.findByPk(req.params.eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Check if user owns this event
+    if (event.organizerId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Find the registration
+    const registration = await EventRegistration.findOne({
+      where: { 
+        id: registrationId,
+        eventId: req.params.eventId,
+        userId: userId
+      },
+      include: [{ model: User, as: 'user', attributes: ['name', 'email'] }]
+    });
+    
+    if (!registration) {
+      return res.status(404).json({ message: 'Registration not found or invalid QR code' });
+    }
+
+    // Check if already attended
+    if (registration.attended) {
+      return res.status(400).json({ 
+        message: 'Student already marked present',
+        studentName: registration.user?.name
+      });
+    }
+
+    // Check if registration is approved
+    if (registration.registrationStatus !== 'approved') {
+      return res.status(400).json({ 
+        message: 'Registration is not approved',
+        studentName: registration.user?.name,
+        status: registration.registrationStatus
+      });
+    }
+
+    // Mark attendance
+    registration.attended = true;
+    registration.attendedAt = new Date();
+    await registration.save();
+
+    console.log(`✅ QR Scan: Attendance marked for ${registration.user?.name}`);
+
+    res.json({ 
+      message: 'Attendance marked successfully',
+      studentName: registration.user?.name,
+      attendedAt: registration.attendedAt,
+      registration: {
+        id: registration.id,
+        attended: registration.attended,
+        attendedAt: registration.attendedAt
+      }
+    });
+  } catch (error) {
+    console.error('QR scan error:', error);
+    res.status(500).json({ message: 'Server error processing QR code' });
   }
 });
 

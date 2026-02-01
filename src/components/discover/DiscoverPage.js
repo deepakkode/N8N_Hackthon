@@ -1,30 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import EventCard from '../events/EventCard';
 import ClubCard from '../clubs/ClubCard';
-import { demoEvents, demoClubs } from './demoData';
 import './DiscoverPage.css';
 
-const DiscoverPage = ({ events = [], clubs = [], currentUser, onRegisterEvent, onUnregisterEvent }) => {
+const DiscoverPage = ({ events = [], clubs = [], currentUser, onRegisterEvent, onUnregisterEvent, clubFilter = null }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [viewMode, setViewMode] = useState('events');
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [filteredClubs, setFilteredClubs] = useState([]);
+  const [activeClubFilter, setActiveClubFilter] = useState(clubFilter);
 
-  // Use demo data if no real data is provided or if real data is empty
-  const displayEvents = events.length > 0 ? events : demoEvents;
-  const displayClubs = clubs.length > 0 ? clubs : demoClubs;
+  // Update club filter when prop changes
+  useEffect(() => {
+    if (clubFilter) {
+      setActiveClubFilter(clubFilter);
+      setViewMode('events'); // Switch to events view when filtering by club
+    }
+  }, [clubFilter]);
+
+  // Use real data only - no demo fallbacks
+  const displayEvents = events || [];
+  const displayClubs = clubs || [];
 
   console.log('DiscoverPage - Real events:', events.length, 'Real clubs:', clubs.length);
-  console.log('DiscoverPage - Display events:', displayEvents.length, 'Display clubs:', displayClubs.length);
 
   const categories = ['all', 'technical', 'cultural', 'sports', 'academic', 'social', 'workshop'];
   const filters = ['all', 'upcoming', 'today', 'this-week', 'trending'];
 
   useEffect(() => {
     filterContent();
-  }, [displayEvents, displayClubs, searchTerm, selectedCategory, selectedFilter, viewMode]);
+  }, [displayEvents, displayClubs, searchTerm, selectedCategory, selectedFilter, viewMode, activeClubFilter]);
 
   const filterContent = () => {
     if (viewMode === 'events') {
@@ -33,7 +40,25 @@ const DiscoverPage = ({ events = [], clubs = [], currentUser, onRegisterEvent, o
                             event.description?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = selectedCategory === 'all' || 
                               event.category?.toLowerCase() === selectedCategory;
-        return matchesSearch && matchesCategory;
+        
+        // Filter by club if specified
+        const matchesClub = !activeClubFilter || 
+                          event.organizerId === activeClubFilter.id ||
+                          event.organizer?.id === activeClubFilter.id ||
+                          event.organizer?._id === activeClubFilter.id;
+        
+        // Debug logging for club filtering
+        if (activeClubFilter) {
+          console.log('Filtering event:', event.title, {
+            eventOrganizerId: event.organizerId,
+            eventOrganizerIdFromObj: event.organizer?.id,
+            eventOrganizerIdFromObj2: event.organizer?._id,
+            clubFilterId: activeClubFilter.id,
+            matchesClub
+          });
+        }
+        
+        return matchesSearch && matchesCategory && matchesClub;
       });
 
       // Apply time-based filters
@@ -114,6 +139,30 @@ const DiscoverPage = ({ events = [], clubs = [], currentUser, onRegisterEvent, o
               />
             </div>
           </div>
+          
+          {/* Club Filter Indicator */}
+          {activeClubFilter && (
+            <div className="club-filter-indicator">
+              <div className="filter-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 21H21" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M5 21V7L13 2L21 7V21" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M9 9V21" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M15 9V21" stroke="currentColor" strokeWidth="2"/>
+                </svg>
+                <span>Showing events from: {activeClubFilter.name}</span>
+                <button 
+                  onClick={() => setActiveClubFilter(null)}
+                  className="clear-filter-btn"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Stats Cards */}
@@ -258,7 +307,7 @@ const DiscoverPage = ({ events = [], clubs = [], currentUser, onRegisterEvent, o
       {/* Content Grid */}
       <div className="content-section">
         {viewMode === 'events' ? (
-          <div className="events-grid">
+          <div className="events-grid stagger-children">
             {filteredEvents.length === 0 ? (
               <div className="no-content">
                 <div className="no-content-icon">
@@ -273,7 +322,7 @@ const DiscoverPage = ({ events = [], clubs = [], currentUser, onRegisterEvent, o
             ) : (
               filteredEvents.map(event => (
                 <EventCard
-                  key={event._id}
+                  key={event.id || event._id || `event-${Math.random()}`}
                   event={event}
                   currentUser={currentUser}
                   onRegister={onRegisterEvent}
@@ -283,7 +332,7 @@ const DiscoverPage = ({ events = [], clubs = [], currentUser, onRegisterEvent, o
             )}
           </div>
         ) : (
-          <div className="clubs-grid">
+          <div className="clubs-grid stagger-children">
             {filteredClubs.length === 0 ? (
               <div className="no-content">
                 <div className="no-content-icon">
