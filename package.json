@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "react-scripts start",
-    "build": "cross-env BUILD_PATH=./dist react-scripts build",
-    "build-netlify": "react-scripts build",
+    "build": "react-scripts build",
+    "build-dist": "cross-env BUILD_PATH=./dist react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

@@ -15,7 +15,8 @@ const corsOptions = {
     ? [
         process.env.FRONTEND_URL, 
         'https://vivento-campus-events.netlify.app',
-        'https://creative-scone-3fca73.netlify.app'
+        'https://creative-scone-3fca73.netlify.app',
+        'https://joyful-meringue-231fb0.netlify.app'
       ]
     : true, // Allow all origins in development
   credentials: true,
